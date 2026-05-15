@@ -1,0 +1,230 @@
+2<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendario de vacaciones</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <script>
+    (function () {
+      try {
+        const theme = localStorage.getItem('calendario-vacaciones-tema');
+        document.documentElement.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+      } catch (_error) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="main">
+    <header id="year">
+      <div id="year-nav" aria-label="Navegacion de ano">
+        <button id="prev-year" class="year-button" type="button" aria-label="Ano anterior">&#8249;</button>
+        <div id="year-title">2026</div>
+        <button id="next-year" class="year-button" type="button" aria-label="Ano siguiente">&#8250;</button>
+      </div>
+
+      <div id="view-buttons" aria-label="Vistas">
+        <button class="view-button active" type="button" data-view="calendar">Calendario</button>
+        <button class="view-button" type="button" data-view="matrix">Cuadricula</button>
+        <button class="view-button" type="button" data-view="schedules">Horarios</button>
+        <button class="view-button" type="button" data-view="employees">Empleados</button>
+      </div>
+
+      <div id="toolbar-actions">
+        <div id="theme-switch" aria-label="Tema visual">
+          <button class="theme-button" type="button" data-theme="dark" aria-pressed="false">Oscuro</button>
+          <button class="theme-button active" type="button" data-theme="light" aria-pressed="true">Claro</button>
+        </div>
+
+        <button id="sync-status" class="sync-status" type="button" data-sync-state="idle" title="Sincronizar ahora">
+          <span class="sync-dot" aria-hidden="true"></span>
+          <span id="sync-status-text">Nube al dia</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="months">
+      <button class="month-button active" type="button" data-month="0">Enero</button>
+      <button class="month-button" type="button" data-month="1">Febrero</button>
+      <button class="month-button" type="button" data-month="2">Marzo</button>
+      <button class="month-button" type="button" data-month="3">Abril</button>
+      <button class="month-button" type="button" data-month="4">Mayo</button>
+      <button class="month-button" type="button" data-month="5">Junio</button>
+      <button class="month-button" type="button" data-month="6">Julio</button>
+      <button class="month-button" type="button" data-month="7">Agosto</button>
+      <button class="month-button" type="button" data-month="8">Septiembre</button>
+      <button class="month-button" type="button" data-month="9">Octubre</button>
+      <button class="month-button" type="button" data-month="10">Noviembre</button>
+      <button class="month-button" type="button" data-month="11">Diciembre</button>
+    </div>
+
+    <section id="calendar-page" class="page active-page">
+      <div id="calendar" aria-label="Calendario mensual"></div>
+    </section>
+
+    <section id="matrix-page" class="page hidden">
+      <div class="matrix-toolbar">
+        <div>
+          <h2 id="matrix-title">Cuadricula mensual</h2>
+          <p>Click en una celda para cambiar la razon.</p>
+        </div>
+        <div class="legend" aria-label="Leyenda">
+          <span><b class="legend-box reason-v">V</b> Vacaciones</span>
+          <span><b class="legend-box reason-d">D</b> Descanso trabajado</span>
+          <span><b class="legend-box reason-i">I</b> Incapacidad</span>
+          <span><b class="legend-box reason-p">P</b> Permiso</span>
+        </div>
+      </div>
+
+      <div id="employee-grid-wrap">
+        <div id="employee-grid" aria-label="Cuadricula de empleados por dia"></div>
+      </div>
+    </section>
+
+    <section id="schedules-page" class="page hidden">
+      <div class="matrix-toolbar">
+        <div>
+          <h2>Horarios</h2>
+          <p>Dias de descanso por empleado.</p>
+        </div>
+        <div class="legend" aria-label="Leyenda de horarios">
+          <span><b class="legend-box schedule-rest"></b> Descanso</span>
+          <span><b class="legend-box schedule-work"></b> Horario</span>
+        </div>
+      </div>
+
+      <div id="schedule-grid-wrap">
+        <div id="schedule-grid" aria-label="Cuadricula semanal de descansos"></div>
+      </div>
+    </section>
+
+    <section id="employees-page" class="page hidden">
+      <div class="employees-layout">
+        <section class="employee-panel employee-list-panel">
+          <div class="employee-panel-header">
+            <div>
+              <h2>Empleados</h2>
+              <p id="employees-count">0 registrados</p>
+            </div>
+            <button id="add-employee-button" class="employee-submit" type="button">Agregar empleado</button>
+          </div>
+
+          <div class="employees-table-wrap">
+            <table class="employees-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Ingreso</th>
+                  <th>Apellidos</th>
+                  <th>Dias</th>
+                  <th>Restantes</th>
+                  <th>Salario</th>
+                  <th>Comentario</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="employees-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="day-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="day-modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <p>Detalle del dia</p>
+          <h2 id="day-modal-title">Sin fecha</h2>
+        </div>
+        <button id="close-day-modal" class="modal-close" type="button" aria-label="Cerrar"></button>
+      </div>
+      <div id="day-modal-content" class="modal-content"></div>
+    </div>
+  </div>
+
+  <div id="employee-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="employee-modal-title">
+    <div class="modal employee-modal">
+      <div class="modal-header">
+        <div>
+          <p id="employee-modal-kicker">Nuevo empleado</p>
+          <h2 id="employee-modal-title">Agregar empleado</h2>
+        </div>
+        <button id="close-employee-modal" class="modal-close" type="button" aria-label="Cerrar"></button>
+      </div>
+
+      <form id="employee-form" class="employee-modal-body">
+        <div class="employee-form-grid">
+          <label>
+            <span>Nombre</span>
+            <input id="employee-name" type="text" autocomplete="off" required>
+          </label>
+          <label>
+            <span>Apellido paterno</span>
+            <input id="employee-lastname-1" type="text" autocomplete="off" required>
+          </label>
+          <label>
+            <span>Apellido materno</span>
+            <input id="employee-lastname-2" type="text" autocomplete="off">
+          </label>
+          <label>
+            <span>Fecha de ingreso</span>
+            <input id="employee-start-date" type="date" required>
+          </label>
+          <label>
+            <span>Salario diario</span>
+            <input id="employee-salary" type="number" min="0" step="0.01" value="0">
+          </label>
+          <label class="employee-comment-field">
+            <span>Comentario</span>
+            <textarea id="employee-comment" rows="3"></textarea>
+          </label>
+        </div>
+
+        <button id="employee-modal-submit" class="employee-submit" type="submit">Guardar empleado</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="schedule-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
+    <div class="modal schedule-modal">
+      <div class="modal-header">
+        <div>
+          <p id="schedule-modal-kicker">Horario</p>
+          <h2 id="schedule-modal-title">Editar horario</h2>
+        </div>
+        <button id="close-schedule-modal" class="modal-close" type="button" aria-label="Cerrar"></button>
+      </div>
+
+      <form id="schedule-form" class="employee-modal-body">
+        <div class="employee-form-grid">
+          <label>
+            <span>Tipo de dia</span>
+            <select id="schedule-type">
+              <option value="work">Horario</option>
+              <option value="rest">Descanso</option>
+            </select>
+          </label>
+          <label>
+            <span>Entrada</span>
+            <input id="schedule-start" type="time">
+          </label>
+          <label>
+            <span>Salida</span>
+            <input id="schedule-end" type="time">
+          </label>
+        </div>
+
+        <button class="employee-submit" type="submit">Guardar horario</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="index.js"></script>
+</body>
+</html>
