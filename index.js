@@ -27,6 +27,7 @@
   const matrixStorageKey = 'calendario-vacaciones-cuadricula';
   const employeesStorageKey = 'calendario-vacaciones-empleados';
   const vacationsStorageKey = 'calendario-vacaciones-registros';
+  const employeeDatabaseStorageKey = 'calendario-vacaciones-empleados-bd';
   const themeStorageKey = 'calendario-vacaciones-tema';
   const themes = ['light', 'dark'];
 
@@ -36,6 +37,10 @@
     { id: 'I', label: 'Incapacidad', className: 'reason-i' },
     { id: 'P', label: 'Permiso', className: 'reason-p' },
   ];
+  const calendarSpecialReasons = {
+    birthday: { id: '🎂', label: 'Cumpleaños', className: 'reason-birthday' },
+    workAnniversary: { id: 'A', label: 'Aniversario laboral', className: 'reason-anniversary' },
+  };
   const reasonJsonKeys = {
     V: 'vacaciones',
     D: 'descansos_trabajados',
@@ -46,6 +51,33 @@
     .map((reason) => reason.id)
     .filter((reasonId) => reasonId !== 'V');
   const knownVacationJsonKeys = Object.values(reasonJsonKeys);
+  const employeeCivilStatuses = ['Soltero', 'Casado', 'Divorciado', 'Viudo', 'Union Libre'];
+  const employeeBloodTypes = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+  const employeePhoneTypes = ['Personal', 'Emergencia1', 'Emergencia2', 'Casa'];
+  const employeeDatabaseSortDefaults = {
+    employee: 'asc',
+    curp: 'asc',
+    age: 'desc',
+    birthday: 'asc',
+    status: 'asc',
+    blood: 'asc',
+    position: 'asc',
+    store: 'asc',
+    phones: 'asc',
+    allergies: 'asc',
+  };
+  const textCollator = new Intl.Collator('es-MX', {
+    sensitivity: 'base',
+    numeric: true,
+  });
+  const emptyEmployeeDatabase = () => ({
+    empleados: [],
+    puestos: [],
+    areas: [],
+    tiendas: [],
+    telefonos: [],
+    alergias: [],
+  });
 
   const fallbackEmployees = [
     { id: 1, nombre: 'USER', apellido_paterno: 'USER', apellido_materno: 'USER', fecha_ingreso: '2026-04-10', salario_diario: 652, horario: {} },
@@ -87,17 +119,25 @@
     vacationsByEmployeeId: {},
     legacyVacationsByEmployeeId: {},
     employees: [],
+    employeeDatabase: emptyEmployeeDatabase(),
     config: defaultConfig,
     editingEmployeeId: null,
+    editingEmployeeDatabaseEmployeeId: null,
     editingSchedule: null,
     theme: 'light',
     needsVacationDataSave: false,
+    birthdayMonthFilter: null,
+    employeeDatabaseSort: {
+      key: null,
+      direction: 'asc',
+    },
   };
 
   const calendarPage = document.querySelector('#calendar-page');
   const matrixPage = document.querySelector('#matrix-page');
   const schedulesPage = document.querySelector('#schedules-page');
   const employeesPage = document.querySelector('#employees-page');
+  const employeeDatabasePage = document.querySelector('#employee-database-page');
   const calendar = document.querySelector('#calendar');
   const employeeGrid = document.querySelector('#employee-grid');
   const scheduleGrid = document.querySelector('#schedule-grid');
@@ -124,6 +164,40 @@
   const scheduleTypeInput = document.querySelector('#schedule-type');
   const scheduleStartInput = document.querySelector('#schedule-start');
   const scheduleEndInput = document.querySelector('#schedule-end');
+  const addEmployeeDatabaseButton = document.querySelector('#add-employee-database-button');
+  const birthdayMonthFilterInput = document.querySelector('#birthday-month-filter');
+  const employeeDatabaseCount = document.querySelector('#employee-database-count');
+  const employeeDatabaseTableBody = document.querySelector('#employee-database-table-body');
+  const employeeDatabaseSortButtons = [...document.querySelectorAll('.employee-database-sort')];
+  const employeeDatabaseModal = document.querySelector('#employee-database-modal');
+  const employeeDatabaseForm = document.querySelector('#employee-database-form');
+  const employeeDatabaseModalKicker = document.querySelector('#employee-database-modal-kicker');
+  const employeeDatabaseModalTitle = document.querySelector('#employee-database-modal-title');
+  const closeEmployeeDatabaseModalButton = document.querySelector('#close-employee-database-modal');
+  const employeeDatabaseSubmit = document.querySelector('#employee-database-submit');
+  const employeeDatabaseEmployeeInput = document.querySelector('#employee-database-employee');
+  const employeeDatabaseCurpInput = document.querySelector('#employee-database-curp');
+  const employeeDatabaseBirthDateInput = document.querySelector('#employee-database-birth-date');
+  const employeeDatabaseCivilStatusInput = document.querySelector('#employee-database-civil-status');
+  const employeeDatabaseBloodTypeInput = document.querySelector('#employee-database-blood-type');
+  const employeeDatabaseAddressInput = document.querySelector('#employee-database-address');
+  const employeeDatabaseEmailInput = document.querySelector('#employee-database-email');
+  const employeeDatabaseSchoolingInput = document.querySelector('#employee-database-schooling');
+  const employeeDatabaseChildrenInput = document.querySelector('#employee-database-children');
+  const employeeDatabaseAreaInput = document.querySelector('#employee-database-area');
+  const employeeDatabasePositionInput = document.querySelector('#employee-database-position');
+  const employeeDatabaseStoreInput = document.querySelector('#employee-database-store');
+  const employeeDatabaseStoreAddressInput = document.querySelector('#employee-database-store-address');
+  const employeeDatabaseAccountInput = document.querySelector('#employee-database-account');
+  const employeeDatabaseCardInput = document.querySelector('#employee-database-card');
+  const employeeDatabasePhonePersonalInput = document.querySelector('#employee-database-phone-personal');
+  const employeeDatabasePhoneEmergency1Input = document.querySelector('#employee-database-phone-emergency-1');
+  const employeeDatabasePhoneEmergency2Input = document.querySelector('#employee-database-phone-emergency-2');
+  const employeeDatabasePhoneHomeInput = document.querySelector('#employee-database-phone-home');
+  const employeeDatabaseAllergiesInput = document.querySelector('#employee-database-allergies');
+  const employeeAreaOptions = document.querySelector('#employee-area-options');
+  const employeePositionOptions = document.querySelector('#employee-position-options');
+  const employeeStoreOptions = document.querySelector('#employee-store-options');
   const matrixTitle = document.querySelector('#matrix-title');
   const dayModal = document.querySelector('#day-modal');
   const dayModalTitle = document.querySelector('#day-modal-title');
@@ -145,6 +219,66 @@
     typeof BroadcastChannel === 'function' ? new BroadcastChannel('calendario-vacaciones-live-sync') : null;
   const externalRefreshTimes = {};
 
+  const errorDetails = (error) => {
+    if (!error) {
+      return null;
+    }
+
+    if (error instanceof Error) {
+      return {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      };
+    }
+
+    if (typeof error === 'object') {
+      return {
+        name: error.name,
+        message: error.message || String(error),
+      };
+    }
+
+    return { message: String(error) };
+  };
+
+  const appLog = (level, message, details = {}) => {
+    const payload = {
+      ...(details || {}),
+      view: state.view,
+      year: state.year,
+      month: state.month + 1,
+    };
+
+    if (window.vacacionesData?.log) {
+      window.vacacionesData.log({ level, message, details: payload }).catch(() => {});
+      return;
+    }
+
+    const consoleMethod = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log';
+    console[consoleMethod](`[Vacaciones] ${message}`, payload);
+  };
+
+  const logInfo = (message, details) => appLog('info', message, details);
+  const logWarn = (message, details) => appLog('warn', message, details);
+  const logError = (message, details) => appLog('error', message, details);
+
+  window.addEventListener('error', (event) => {
+    logError('Error no controlado en interfaz', {
+      message: event.message,
+      source: event.filename,
+      line: event.lineno,
+      column: event.colno,
+      error: errorDetails(event.error),
+    });
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    logError('Promesa rechazada no controlada en interfaz', {
+      reason: errorDetails(event.reason),
+    });
+  });
+
   const pad = (value) => String(value).padStart(2, '0');
   const dateKey = (year, month, day) => `${year}-${pad(month + 1)}-${pad(day)}`;
 
@@ -159,7 +293,8 @@
   const readStorage = (key, fallback) => {
     try {
       return JSON.parse(localStorage.getItem(key)) || fallback;
-    } catch (_error) {
+    } catch (error) {
+      logWarn('No se pudo leer localStorage', { key, error: errorDetails(error) });
       return fallback;
     }
   };
@@ -168,7 +303,8 @@
     try {
       const savedTheme = localStorage.getItem(themeStorageKey);
       return themes.includes(savedTheme) ? savedTheme : 'light';
-    } catch (_error) {
+    } catch (error) {
+      logWarn('No se pudo leer el tema guardado', { error: errorDetails(error) });
       return 'light';
     }
   };
@@ -188,7 +324,8 @@
   const saveTheme = (theme) => {
     try {
       localStorage.setItem(themeStorageKey, theme);
-    } catch (_error) {
+    } catch (error) {
+      logWarn('No se pudo guardar el tema en localStorage', { theme, error: errorDetails(error) });
       // The visual change can still be applied if localStorage is unavailable.
     }
 
@@ -206,7 +343,8 @@
         scope,
         sourceId: liveSyncSourceId,
       });
-    } catch (_error) {
+    } catch (error) {
+      logWarn('No se pudo anunciar cambio local en ventana activa', { scope, error: errorDetails(error) });
       // The storage event still covers standard browser tabs and windows.
     }
   };
@@ -241,6 +379,12 @@
       return;
     }
 
+    if (scope === 'employeeDatabase') {
+      state.employeeDatabase = normalizeEmployeeDatabaseData(readStorage(employeeDatabaseStorageKey, emptyEmployeeDatabase()));
+      renderAll();
+      return;
+    }
+
     if (scope === 'matrix' || scope === 'vacations') {
       state.employeeDayEvents = readStorage(matrixStorageKey, {});
       applyVacationData(readStorage(vacationsStorageKey, fallbackVacationRecords));
@@ -266,13 +410,16 @@
         await loadEmployees();
       } else if (datasetKey === 'vacations') {
         await loadVacations();
+      } else if (datasetKey === 'employeeDatabase') {
+        await loadEmployeeDatabase();
       } else {
         await reloadSyncedData();
         return;
       }
 
       renderAll();
-    } catch (_error) {
+    } catch (error) {
+      logError('No se pudo aplicar actualizacion externa', { datasetKey, error: errorDetails(error) });
       // Keep current data if the external refresh fails.
     }
   };
@@ -289,9 +436,12 @@
     let syncState = 'idle';
     let text = 'Nube al dia';
 
-    if (!window.vacacionesData?.getSyncStatus || status.enabled === false) {
+    if (!window.vacacionesData?.getSyncStatus) {
       syncState = 'disabled';
       text = 'Solo local';
+    } else if (status.enabled === false) {
+      syncState = 'disabled';
+      text = 'Solo LAN';
     } else if (isSyncing) {
       syncState = 'syncing';
       text = 'Sincronizando';
@@ -319,13 +469,15 @@
 
     try {
       updateSyncStatus(await window.vacacionesData.getSyncStatus());
-    } catch (_error) {
+    } catch (error) {
+      logWarn('No se pudo leer el estado de sincronizacion', { error: errorDetails(error) });
       updateSyncStatus({ enabled: true, lastError: 'No se pudo leer el estado de sincronizacion.' });
     }
   };
 
   const reloadSyncedData = async () => {
     await loadEmployees();
+    await loadEmployeeDatabase();
     await loadVacations();
     renderAll();
   };
@@ -361,6 +513,151 @@
 
     if (employee.comentario) {
       normalized.comentario = employee.comentario;
+    }
+
+    return normalized;
+  };
+
+  const trimmedText = (value, maxLength = 255) =>
+    String(value ?? '').trim().slice(0, maxLength);
+
+  const positiveIntegerOrNull = (value) => {
+    const number = Number(value);
+
+    return Number.isFinite(number) && number > 0 ? Math.trunc(number) : null;
+  };
+
+  const normalizeDateString = (value) => {
+    const text = trimmedText(value, 10);
+
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+  };
+
+  const normalizeMoney = (value) => {
+    const number = Number(value);
+
+    return Number.isFinite(number) && number >= 0 ? Number(number.toFixed(2)) : 0;
+  };
+
+  const normalizeCivilStatus = (value) => {
+    const text = trimmedText(value, 20).replace('Uni\u00f3n Libre', 'Union Libre');
+
+    return employeeCivilStatuses.includes(text) ? text : '';
+  };
+
+  const normalizeBloodType = (value) => {
+    const text = trimmedText(value, 3).toUpperCase();
+
+    return employeeBloodTypes.includes(text) ? text : '';
+  };
+
+  const normalizeTableById = (rows = [], normalizer, idKey) => {
+    const normalizedById = new Map();
+
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const normalized = normalizer(row);
+
+      if (normalized[idKey] != null) {
+        normalizedById.set(String(normalized[idKey]), normalized);
+      }
+    });
+
+    return [...normalizedById.values()].sort((a, b) => Number(a[idKey]) - Number(b[idKey]));
+  };
+
+  const normalizeEmployeeDatabaseEmployee = (employee = {}) => ({
+    id_empleado: positiveIntegerOrNull(employee.id_empleado ?? employee.id),
+    nombre: trimmedText(employee.nombre, 100),
+    curp: trimmedText(employee.curp, 18).toUpperCase(),
+    fecha_nacimiento: normalizeDateString(employee.fecha_nacimiento),
+    estado_civil: normalizeCivilStatus(employee.estado_civil),
+    tipo_sangre: normalizeBloodType(employee.tipo_sangre),
+    direccion: trimmedText(employee.direccion, 255),
+    correo: trimmedText(employee.correo, 120).toLowerCase(),
+    num_cuenta: trimmedText(employee.num_cuenta, 20),
+    num_tarjeta: trimmedText(employee.num_tarjeta, 20),
+    escolaridad: trimmedText(employee.escolaridad, 50),
+    num_hijos: Math.max(0, Math.min(99, Number.parseInt(employee.num_hijos, 10) || 0)),
+    fecha_ingreso: normalizeDateString(employee.fecha_ingreso),
+    salario: normalizeMoney(employee.salario),
+    id_puesto: positiveIntegerOrNull(employee.id_puesto),
+    id_tienda: positiveIntegerOrNull(employee.id_tienda),
+  });
+
+  const normalizeArea = (area = {}) => ({
+    id_area: positiveIntegerOrNull(area.id_area ?? area.id),
+    nombre_area: trimmedText(area.nombre_area ?? area.nombre, 80),
+  });
+
+  const normalizeStore = (store = {}) => ({
+    id_tienda: positiveIntegerOrNull(store.id_tienda ?? store.id),
+    nombre_tienda: trimmedText(store.nombre_tienda ?? store.nombre, 80),
+    direccion_tienda: trimmedText(store.direccion_tienda ?? store.direccion, 255),
+  });
+
+  const normalizePosition = (position = {}) => ({
+    id_puesto: positiveIntegerOrNull(position.id_puesto ?? position.id),
+    nombre_puesto: trimmedText(position.nombre_puesto ?? position.nombre, 80),
+    id_area: positiveIntegerOrNull(position.id_area),
+  });
+
+  const normalizePhone = (phone = {}) => {
+    const type = trimmedText(phone.tipo, 20);
+
+    return {
+      id_telefono: positiveIntegerOrNull(phone.id_telefono ?? phone.id),
+      id_empleado: positiveIntegerOrNull(phone.id_empleado),
+      numero: trimmedText(phone.numero, 20),
+      tipo: employeePhoneTypes.includes(type) ? type : 'Personal',
+    };
+  };
+
+  const normalizeAllergy = (allergy = {}) => ({
+    id_alergia: positiveIntegerOrNull(allergy.id_alergia ?? allergy.id),
+    id_empleado: positiveIntegerOrNull(allergy.id_empleado),
+    descripcion: trimmedText(allergy.descripcion, 120),
+  });
+
+  const normalizeEmployeeDatabaseData = (data = {}) => {
+    const source = data && typeof data === 'object' ? data : {};
+    const areas = normalizeTableById(source.areas, normalizeArea, 'id_area').filter((area) => area.nombre_area);
+    const stores = normalizeTableById(source.tiendas, normalizeStore, 'id_tienda').filter(
+      (store) => store.nombre_tienda,
+    );
+    const areaIds = new Set(areas.map((area) => String(area.id_area)));
+    const positions = normalizeTableById(source.puestos, normalizePosition, 'id_puesto')
+      .filter((position) => position.nombre_puesto)
+      .map((position) => ({
+        ...position,
+        id_area: areaIds.has(String(position.id_area)) ? position.id_area : null,
+      }));
+    const positionIds = new Set(positions.map((position) => String(position.id_puesto)));
+    const storeIds = new Set(stores.map((store) => String(store.id_tienda)));
+    const employees = normalizeTableById(source.empleados, normalizeEmployeeDatabaseEmployee, 'id_empleado')
+      .filter((employee) => employee.nombre)
+      .map((employee) => ({
+        ...employee,
+        id_puesto: positionIds.has(String(employee.id_puesto)) ? employee.id_puesto : null,
+        id_tienda: storeIds.has(String(employee.id_tienda)) ? employee.id_tienda : null,
+      }));
+    const employeeIds = new Set(employees.map((employee) => String(employee.id_empleado)));
+    const phones = normalizeTableById(source.telefonos, normalizePhone, 'id_telefono').filter(
+      (phone) => employeeIds.has(String(phone.id_empleado)) && phone.numero,
+    );
+    const allergies = normalizeTableById(source.alergias, normalizeAllergy, 'id_alergia').filter(
+      (allergy) => employeeIds.has(String(allergy.id_empleado)) && allergy.descripcion,
+    );
+    const normalized = {
+      empleados: employees,
+      puestos: positions,
+      areas,
+      tiendas: stores,
+      telefonos: phones,
+      alergias: allergies,
+    };
+
+    if (source.__sync && typeof source.__sync === 'object' && !Array.isArray(source.__sync)) {
+      normalized.__sync = { ...source.__sync };
     }
 
     return normalized;
@@ -467,6 +764,283 @@
     state.legacyVacationsByEmployeeId = vacationRecordsToMap(legacyVacationRecords);
   };
 
+  const databaseRowById = (rows = [], idKey, id) =>
+    rows.find((row) => String(row[idKey]) === String(id)) || null;
+
+  const employeeDatabaseDetailById = (employeeId) =>
+    databaseRowById(state.employeeDatabase.empleados, 'id_empleado', employeeId);
+
+  const employeeDatabasePhonesForEmployee = (employeeId) =>
+    state.employeeDatabase.telefonos.filter((phone) => String(phone.id_empleado) === String(employeeId));
+
+  const employeeDatabaseAllergiesForEmployee = (employeeId) =>
+    state.employeeDatabase.alergias.filter((allergy) => String(allergy.id_empleado) === String(employeeId));
+
+  const employeeDatabasePhoneInputs = () => ({
+    Personal: employeeDatabasePhonePersonalInput,
+    Emergencia1: employeeDatabasePhoneEmergency1Input,
+    Emergencia2: employeeDatabasePhoneEmergency2Input,
+    Casa: employeeDatabasePhoneHomeInput,
+  });
+
+  const databaseTextKey = (value) => trimmedText(value).toLowerCase();
+
+  const nextDatabaseId = (rows = [], idKey) =>
+    rows.reduce((maxId, row) => Math.max(maxId, Number(row[idKey]) || 0), 0) + 1;
+
+  const databaseRowByName = (rows = [], nameKey, name) => {
+    const key = databaseTextKey(name);
+
+    if (!key) {
+      return null;
+    }
+
+    return rows.find((row) => databaseTextKey(row[nameKey]) === key) || null;
+  };
+
+  const upsertDatabaseArea = (name) => {
+    const areaName = trimmedText(name, 80);
+
+    if (!areaName) {
+      return null;
+    }
+
+    const existing = databaseRowByName(state.employeeDatabase.areas, 'nombre_area', areaName);
+    if (existing) {
+      existing.nombre_area = areaName;
+      return existing.id_area;
+    }
+
+    const area = {
+      id_area: nextDatabaseId(state.employeeDatabase.areas, 'id_area'),
+      nombre_area: areaName,
+    };
+    state.employeeDatabase.areas.push(area);
+    return area.id_area;
+  };
+
+  const upsertDatabaseStore = (name, address) => {
+    const storeName = trimmedText(name, 80);
+    const storeAddress = trimmedText(address, 255);
+
+    if (!storeName) {
+      return null;
+    }
+
+    const existing = databaseRowByName(state.employeeDatabase.tiendas, 'nombre_tienda', storeName);
+    if (existing) {
+      existing.nombre_tienda = storeName;
+      existing.direccion_tienda = storeAddress || existing.direccion_tienda || '';
+      return existing.id_tienda;
+    }
+
+    const store = {
+      id_tienda: nextDatabaseId(state.employeeDatabase.tiendas, 'id_tienda'),
+      nombre_tienda: storeName,
+      direccion_tienda: storeAddress,
+    };
+    state.employeeDatabase.tiendas.push(store);
+    return store.id_tienda;
+  };
+
+  const upsertDatabasePosition = (name, areaId) => {
+    const positionName = trimmedText(name, 80);
+
+    if (!positionName) {
+      return null;
+    }
+
+    const existing = databaseRowByName(state.employeeDatabase.puestos, 'nombre_puesto', positionName);
+    if (existing) {
+      existing.nombre_puesto = positionName;
+      existing.id_area = positiveIntegerOrNull(areaId);
+      return existing.id_puesto;
+    }
+
+    const position = {
+      id_puesto: nextDatabaseId(state.employeeDatabase.puestos, 'id_puesto'),
+      nombre_puesto: positionName,
+      id_area: positiveIntegerOrNull(areaId),
+    };
+    state.employeeDatabase.puestos.push(position);
+    return position.id_puesto;
+  };
+
+  const ageFromBirthDate = (birthDate) => {
+    const birth = new Date(`${birthDate}T00:00:00`);
+
+    if (Number.isNaN(birth.getTime())) {
+      return '';
+    }
+
+    let years = today.getFullYear() - birth.getFullYear();
+    const birthday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
+
+    if (birthday > today) {
+      years -= 1;
+    }
+
+    return Math.max(0, years);
+  };
+
+  const shortMonthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  const formatBirthMonthDay = (birthDate) => {
+    const parts = dateParts(birthDate);
+    if (!parts) return '';
+    return `${parts.day} ${shortMonthNames[parts.month - 1]}`;
+  };
+
+  const dateParts = (value) => {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (!match) {
+      return null;
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(year, month - 1, day);
+
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return null;
+    }
+
+    return { year, month, day };
+  };
+
+  const recurringDateForYear = (sourceDate, year) => {
+    const parts = dateParts(sourceDate);
+
+    if (!parts || year < parts.year) {
+      return null;
+    }
+
+    const daysInMonth = new Date(year, parts.month, 0).getDate();
+    const recurringDay = Math.min(parts.day, daysInMonth);
+
+    return {
+      key: `${year}-${pad(parts.month)}-${pad(recurringDay)}`,
+      years: year - parts.year,
+    };
+  };
+
+  const birthDateFromCurp = (curp) => {
+    const match = trimmedText(curp, 18).toUpperCase().match(/^[A-Z]{4}(\d{2})(\d{2})(\d{2})/);
+
+    if (!match) {
+      return '';
+    }
+
+    const shortYear = Number(match[1]);
+    const month = match[2];
+    const day = match[3];
+    const currentShortYear = today.getFullYear() % 100;
+    const year = (shortYear <= currentShortYear ? 2000 : 1900) + shortYear;
+    const birthDate = `${year}-${month}-${day}`;
+
+    return dateParts(birthDate) ? birthDate : '';
+  };
+
+  const employeeBirthDate = (employee) => {
+    const detail = employeeDatabaseDetailById(employee.id);
+
+    return detail?.fecha_nacimiento || birthDateFromCurp(detail?.curp);
+  };
+
+  const duplicateEmployeeDatabaseValue = (field, value, employeeId) => {
+    const normalizedValue = field === 'curp'
+      ? trimmedText(value, 18).toUpperCase()
+      : field === 'correo'
+        ? trimmedText(value, 120).toLowerCase()
+        : trimmedText(value, 20);
+
+    if (!normalizedValue) {
+      return null;
+    }
+
+    return state.employeeDatabase.empleados.find((detail) => {
+      if (String(detail.id_empleado) === String(employeeId)) {
+        return false;
+      }
+
+      const candidate = field === 'curp'
+        ? trimmedText(detail[field], 18).toUpperCase()
+        : field === 'correo'
+          ? trimmedText(detail[field], 120).toLowerCase()
+          : trimmedText(detail[field], 20);
+
+      return candidate === normalizedValue;
+    }) || null;
+  };
+
+  const validateEmployeeDatabaseUniqueFields = (detail) => {
+    const fieldLabels = {
+      curp: 'CURP',
+      correo: 'correo',
+      num_cuenta: 'cuenta bancaria',
+      num_tarjeta: 'tarjeta',
+    };
+
+    return Object.keys(fieldLabels).every((field) => {
+      const duplicate = duplicateEmployeeDatabaseValue(field, detail[field], detail.id_empleado);
+
+      if (!duplicate) {
+        return true;
+      }
+
+      window.alert(`El ${fieldLabels[field]} ya esta registrado en otro empleado.`);
+      return false;
+    });
+  };
+
+  const removeEmployeeDatabaseRecord = (employeeId) => {
+    const before = JSON.stringify(state.employeeDatabase);
+    const key = String(employeeId);
+
+    state.employeeDatabase.empleados = state.employeeDatabase.empleados.filter(
+      (detail) => String(detail.id_empleado) !== key,
+    );
+    state.employeeDatabase.telefonos = state.employeeDatabase.telefonos.filter(
+      (phone) => String(phone.id_empleado) !== key,
+    );
+    state.employeeDatabase.alergias = state.employeeDatabase.alergias.filter(
+      (allergy) => String(allergy.id_empleado) !== key,
+    );
+
+    return before !== JSON.stringify(state.employeeDatabase);
+  };
+
+  const syncEmployeeDatabaseCoreFields = (employee) => {
+    const detail = employeeDatabaseDetailById(employee.id);
+
+    if (!detail) {
+      return false;
+    }
+
+    const updatedDetail = {
+      ...detail,
+      nombre: employeeName(employee),
+      fecha_ingreso: employee.fecha_ingreso || '',
+      salario: normalizeMoney(employee.salario_diario),
+    };
+    const changed = JSON.stringify(detail) !== JSON.stringify(updatedDetail);
+
+    if (changed) {
+      state.employeeDatabase.empleados = state.employeeDatabase.empleados.map((item) =>
+        String(item.id_empleado) === String(employee.id) ? updatedDetail : item,
+      );
+    }
+
+    return changed;
+  };
+
   const vacationDaysForRecord = (employeeId) => state.vacationsByEmployeeId[String(employeeId)] || [];
 
   const vacationDaysForEmployeeRecord = (employee) => vacationDaysForRecord(employee.id);
@@ -542,6 +1116,28 @@
     [reasonJsonKeys.P]: employeeDayRecordsFromState('P'),
   });
 
+  const recordDayCount = (records = []) =>
+    (Array.isArray(records) ? records : []).reduce((total, record) => total + normalizeDays(record.dias || []).length, 0);
+
+  const vacationDataSummary = (data = {}) =>
+    Object.entries(reasonJsonKeys).reduce((summary, [reasonId, jsonKey]) => {
+      const records = vacationRecordList(data, reasonId);
+      summary[jsonKey] = {
+        empleados: records.length,
+        dias: recordDayCount(records),
+      };
+      return summary;
+    }, {});
+
+  const employeeDatabaseSummary = (database = state.employeeDatabase) => ({
+    expedientes: database.empleados.length,
+    puestos: database.puestos.length,
+    areas: database.areas.length,
+    tiendas: database.tiendas.length,
+    telefonos: database.telefonos.length,
+    alergias: database.alergias.length,
+  });
+
   const saveCalendarEvents = () => {
     localStorage.setItem(calendarStorageKey, JSON.stringify(state.events));
     announceLiveSync('calendar');
@@ -558,45 +1154,94 @@
 
     localOnlySaveWarningShown = true;
     window.alert(
-      'Para guardar cambios en empleados.json y vacaciones.json, abre la app con npm start. En el navegador solo se guarda localmente.',
+      'Para guardar cambios en los archivos JSON, abre la app con npm start. En el navegador solo se guarda localmente.',
     );
   };
 
   const saveEmployees = async () => {
-    state.employees = state.employees.map(normalizeEmployee);
-    localStorage.setItem(employeesStorageKey, JSON.stringify(state.employees));
+    try {
+      state.employees = state.employees.map(normalizeEmployee);
+      localStorage.setItem(employeesStorageKey, JSON.stringify(state.employees));
 
-    if (!window.vacacionesData?.saveEmployees) {
-      warnLocalOnlySave();
+      if (!window.vacacionesData?.saveEmployees) {
+        warnLocalOnlySave();
+        announceLiveSync('employees');
+        logWarn('Empleados guardados solo en navegador', { total: state.employees.length });
+        return;
+      }
+
+      state.employees = await window.vacacionesData.saveEmployees(state.employees);
+      localStorage.setItem(employeesStorageKey, JSON.stringify(state.employees));
       announceLiveSync('employees');
-      return;
+      await refreshSyncStatus();
+      logInfo('Empleados guardados', { total: state.employees.length });
+    } catch (error) {
+      logError('No se pudieron guardar empleados', {
+        total: state.employees.length,
+        error: errorDetails(error),
+      });
+      throw error;
     }
-
-    state.employees = await window.vacacionesData.saveEmployees(state.employees);
-    localStorage.setItem(employeesStorageKey, JSON.stringify(state.employees));
-    announceLiveSync('employees');
-    await refreshSyncStatus();
   };
 
   const saveVacations = async () => {
     const vacationData = vacationDataFromState();
-    localStorage.setItem(vacationsStorageKey, JSON.stringify(vacationData));
-    saveMatrixEvents();
 
-    if (!window.vacacionesData?.saveVacations) {
-      warnLocalOnlySave();
+    try {
+      localStorage.setItem(vacationsStorageKey, JSON.stringify(vacationData));
+      saveMatrixEvents();
+
+      if (!window.vacacionesData?.saveVacations) {
+        warnLocalOnlySave();
+        announceLiveSync('vacations');
+        logWarn('Vacaciones guardadas solo en navegador', { summary: vacationDataSummary(vacationData) });
+        return;
+      }
+
+      const savedData = await window.vacacionesData.saveVacations(vacationData);
+      state.vacationsByEmployeeId = mergeVacationMaps(vacationRecordsToMap(savedData, 'V'));
+      state.employeeDayEvents = employeeDayEventsFromVacationData(savedData);
+      state.needsVacationDataSave = false;
+      localStorage.setItem(vacationsStorageKey, JSON.stringify(savedData));
+      saveMatrixEvents();
       announceLiveSync('vacations');
-      return;
+      await refreshSyncStatus();
+      logInfo('Vacaciones y eventos de empleados guardados', { summary: vacationDataSummary(savedData) });
+    } catch (error) {
+      logError('No se pudieron guardar vacaciones y eventos', {
+        summary: vacationDataSummary(vacationData),
+        error: errorDetails(error),
+      });
+      throw error;
     }
+  };
 
-    const savedData = await window.vacacionesData.saveVacations(vacationData);
-    state.vacationsByEmployeeId = mergeVacationMaps(vacationRecordsToMap(savedData, 'V'));
-    state.employeeDayEvents = employeeDayEventsFromVacationData(savedData);
-    state.needsVacationDataSave = false;
-    localStorage.setItem(vacationsStorageKey, JSON.stringify(savedData));
-    saveMatrixEvents();
-    announceLiveSync('vacations');
-    await refreshSyncStatus();
+  const saveEmployeeDatabase = async () => {
+    try {
+      state.employeeDatabase = normalizeEmployeeDatabaseData(state.employeeDatabase);
+      localStorage.setItem(employeeDatabaseStorageKey, JSON.stringify(state.employeeDatabase));
+
+      if (!window.vacacionesData?.saveEmployeeDatabase) {
+        warnLocalOnlySave();
+        announceLiveSync('employeeDatabase');
+        logWarn('Expedientes guardados solo en navegador', { summary: employeeDatabaseSummary() });
+        return;
+      }
+
+      state.employeeDatabase = normalizeEmployeeDatabaseData(
+        await window.vacacionesData.saveEmployeeDatabase(state.employeeDatabase),
+      );
+      localStorage.setItem(employeeDatabaseStorageKey, JSON.stringify(state.employeeDatabase));
+      announceLiveSync('employeeDatabase');
+      await refreshSyncStatus();
+      logInfo('Expedientes guardados', { summary: employeeDatabaseSummary() });
+    } catch (error) {
+      logError('No se pudieron guardar expedientes', {
+        summary: employeeDatabaseSummary(),
+        error: errorDetails(error),
+      });
+      throw error;
+    }
   };
 
   const employeeName = (employee) =>
@@ -604,6 +1249,133 @@
       .filter(Boolean)
       .join(' ')
       .trim() || `Empleado ${employee.id}`;
+
+  const isEmptySortValue = (value) => value == null || value === '';
+
+  const compareEmployeeDatabaseSortValues = (aValue, bValue, direction) => {
+    const aEmpty = isEmptySortValue(aValue);
+    const bEmpty = isEmptySortValue(bValue);
+
+    if (aEmpty || bEmpty) {
+      return Number(aEmpty) - Number(bEmpty);
+    }
+
+    const multiplier = direction === 'desc' ? -1 : 1;
+    const result = typeof aValue === 'number' && typeof bValue === 'number'
+      ? aValue - bValue
+      : textCollator.compare(String(aValue), String(bValue));
+
+    return result * multiplier;
+  };
+
+  const employeeDatabaseRowData = (employee) => {
+    const detail = employeeDatabaseDetailById(employee.id);
+    const position = detail?.id_puesto
+      ? databaseRowById(state.employeeDatabase.puestos, 'id_puesto', detail.id_puesto)
+      : null;
+    const area = position?.id_area
+      ? databaseRowById(state.employeeDatabase.areas, 'id_area', position.id_area)
+      : null;
+    const store = detail?.id_tienda
+      ? databaseRowById(state.employeeDatabase.tiendas, 'id_tienda', detail.id_tienda)
+      : null;
+    const phones = employeeDatabasePhonesForEmployee(employee.id);
+    const allergies = employeeDatabaseAllergiesForEmployee(employee.id);
+    const birthDate = employeeBirthDate(employee);
+    const birthParts = dateParts(birthDate);
+    const age = detail?.fecha_nacimiento ? ageFromBirthDate(detail.fecha_nacimiento) : '';
+    const birthdayLabel = birthDate ? formatBirthMonthDay(birthDate) : '';
+    const positionLabel = position
+      ? `${position.nombre_puesto}${area ? ` / ${area.nombre_area}` : ''}`
+      : '';
+    const phoneText = phones.map((phone) => `${phone.tipo}: ${phone.numero}`).join(' ');
+    const phoneLabel = phones
+      .map((phone) => `${escapeHtml(phone.tipo)}: ${escapeHtml(phone.numero)}`)
+      .join('<br>');
+    const allergyLabel = allergies.map((allergy) => allergy.descripcion).join(', ');
+
+    return {
+      employee,
+      detail,
+      age,
+      birthdayLabel,
+      positionLabel,
+      storeLabel: store?.nombre_tienda || '',
+      phoneLabel,
+      allergyLabel,
+      sortValues: {
+        employee: employeeName(employee),
+        curp: detail?.curp || '',
+        age: age === '' ? null : age,
+        birthday: birthParts ? birthParts.month * 100 + birthParts.day : null,
+        status: detail?.estado_civil || '',
+        blood: detail?.tipo_sangre || '',
+        position: positionLabel,
+        store: store?.nombre_tienda || '',
+        phones: phoneText,
+        allergies: allergyLabel,
+      },
+    };
+  };
+
+  const sortedEmployeeDatabaseRows = (rows) => {
+    const { key, direction } = state.employeeDatabaseSort;
+
+    if (!employeeDatabaseSortDefaults[key]) {
+      return rows;
+    }
+
+    return [...rows].sort((a, b) => {
+      const result = compareEmployeeDatabaseSortValues(a.sortValues[key], b.sortValues[key], direction);
+
+      if (result !== 0) {
+        return result;
+      }
+
+      const nameResult = textCollator.compare(a.sortValues.employee, b.sortValues.employee);
+      if (nameResult !== 0) {
+        return nameResult;
+      }
+
+      return textCollator.compare(String(a.employee.id), String(b.employee.id));
+    });
+  };
+
+  const renderEmployeeDatabaseSortControls = () => {
+    employeeDatabaseSortButtons.forEach((button) => {
+      const active = button.dataset.sortKey === state.employeeDatabaseSort.key;
+      const direction = active ? state.employeeDatabaseSort.direction : '';
+      const header = button.closest('th');
+
+      button.classList.toggle('active', active);
+      button.dataset.sortDirection = direction;
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      button.title = active
+        ? `Orden ${direction === 'desc' ? 'descendente' : 'ascendente'}. Click para invertir.`
+        : 'Click para ordenar esta columna.';
+
+      if (header) {
+        header.setAttribute(
+          'aria-sort',
+          active ? (direction === 'desc' ? 'descending' : 'ascending') : 'none',
+        );
+      }
+    });
+  };
+
+  const setEmployeeDatabaseSort = (sortKey) => {
+    if (!employeeDatabaseSortDefaults[sortKey]) {
+      return;
+    }
+
+    const current = state.employeeDatabaseSort;
+    const direction = current.key === sortKey
+      ? (current.direction === 'asc' ? 'desc' : 'asc')
+      : employeeDatabaseSortDefaults[sortKey];
+
+    state.employeeDatabaseSort = { key: sortKey, direction };
+    renderEmployeeDatabase();
+  };
 
   const getReason = (reasonId) => reasons.find((reason) => reason.id === reasonId);
 
@@ -629,8 +1401,38 @@
     return Math.max(0, years);
   };
 
-  const vacationDaysForEmployee = (employee) => {
-    const years = completedYears(employee.fecha_ingreso);
+  // Returns the labor year (año laboral) that contains referenceDate, anchored to the employee's start date.
+  // The labor year runs from one anniversary to the next, not from Jan 1.
+  const getLaborYearRange = (startDate, referenceDate = today) => {
+    const start = new Date(`${startDate}T00:00:00`);
+
+    if (Number.isNaN(start.getTime())) {
+      return null;
+    }
+
+    let anniversaryYear = referenceDate.getFullYear();
+    let anniversary = new Date(anniversaryYear, start.getMonth(), start.getDate());
+
+    if (anniversary > referenceDate) {
+      anniversaryYear -= 1;
+      anniversary = new Date(anniversaryYear, start.getMonth(), start.getDate());
+    }
+
+    // Employee has not yet reached their first anniversary
+    if (anniversary < start) {
+      return null;
+    }
+
+    return {
+      laborStartStr: `${anniversaryYear}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
+      laborEndStr: `${anniversaryYear + 1}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
+      yearsCompleted: anniversaryYear - start.getFullYear(),
+    };
+  };
+
+  const vacationDaysForEmployee = (employee, referenceDate = today) => {
+    const range = getLaborYearRange(employee.fecha_ingreso, referenceDate);
+    const years = range ? range.yearsCompleted : completedYears(employee.fecha_ingreso);
     const table = state.config?.tablaVacaciones || defaultConfig.tablaVacaciones;
     const rule = table.find(
       (item) =>
@@ -641,13 +1443,20 @@
     return rule?.dias || 0;
   };
 
-  const vacationDaysTakenForEmployee = (employee) => {
+  const vacationDaysTakenForEmployee = (employee, referenceDate = today) => {
+    const range = getLaborYearRange(employee.fecha_ingreso, referenceDate);
+
+    if (!range) {
+      return 0;
+    }
+
+    const { laborStartStr, laborEndStr } = range;
+    const inLaborYear = (date) => date >= laborStartStr && date < laborEndStr;
     const dates = new Set();
-    const yearPrefix = `${state.year}-`;
     const eventPrefix = `${employee.id}-`;
 
     vacationDaysForEmployeeRecord(employee).forEach((date) => {
-      if (!date.startsWith(yearPrefix)) {
+      if (!inLaborYear(date)) {
         return;
       }
 
@@ -663,7 +1472,7 @@
       }
 
       const date = key.slice(eventPrefix.length);
-      if (!date.startsWith(yearPrefix)) {
+      if (!inLaborYear(date)) {
         return;
       }
 
@@ -677,13 +1486,55 @@
     return dates.size;
   };
 
-  const remainingVacationDaysForEmployee = (employee) =>
-    Math.max(0, vacationDaysForEmployee(employee) - vacationDaysTakenForEmployee(employee));
+  const remainingVacationDaysForEmployee = (employee, referenceDate = today) =>
+    Math.max(0, vacationDaysForEmployee(employee, referenceDate) - vacationDaysTakenForEmployee(employee, referenceDate));
 
   const nextEmployeeId = () =>
     state.employees.reduce((maxId, employee) => Math.max(maxId, Number(employee.id) || 0), 0) + 1;
 
+  const getCalendarSpecialEntries = (key) => {
+    const [yearText] = key.split('-');
+    const calendarYear = Number(yearText);
+
+    if (!Number.isFinite(calendarYear)) {
+      return [];
+    }
+
+    return state.employees.flatMap((employee) => {
+      const entries = [];
+      const birthday = recurringDateForYear(employeeBirthDate(employee), calendarYear);
+      const anniversary = recurringDateForYear(employee.fecha_ingreso, calendarYear);
+
+      if (birthday?.key === key) {
+        entries.push({
+          type: 'birthday',
+          employee,
+          name: employeeName(employee),
+          reason: {
+            ...calendarSpecialReasons.birthday,
+            label: `${calendarSpecialReasons.birthday.label} (${birthday.years} años)`,
+          },
+        });
+      }
+
+      if (anniversary?.key === key && anniversary.years > 0) {
+        entries.push({
+          type: 'work-anniversary',
+          employee,
+          name: employeeName(employee),
+          reason: {
+            ...calendarSpecialReasons.workAnniversary,
+            label: `${calendarSpecialReasons.workAnniversary.label} (${anniversary.years} años)`,
+          },
+        });
+      }
+
+      return entries;
+    });
+  };
+
   const getDayEntries = (key) => {
+    const specialEntries = getCalendarSpecialEntries(key);
     const employeeEntries = state.employees
       .map((employee) => {
         const reasonId = getEmployeeDayReason(employee, key);
@@ -708,7 +1559,7 @@
       reason: { id: 'N', label: 'Nota', className: 'reason-note' },
     }));
 
-    return [...employeeEntries, ...notes];
+    return [...specialEntries, ...employeeEntries, ...notes];
   };
 
   const validEmployeeDayEvents = (events = {}) =>
@@ -747,9 +1598,14 @@
         const employees = await window.vacacionesData.getEmployees();
         setEmployees(employees);
         localStorage.setItem(employeesStorageKey, JSON.stringify(state.employees));
+        logInfo('Empleados cargados', { source: 'archivo-json', total: state.employees.length });
         return;
-      } catch (_error) {
+      } catch (error) {
         setEmployees(fallbackEmployees);
+        logError('No se pudieron cargar empleados desde archivo; usando respaldo', {
+          error: errorDetails(error),
+          total: state.employees.length,
+        });
         return;
       }
     }
@@ -759,8 +1615,13 @@
       const data = await response.json();
       setEmployees(data.empleados || fallbackEmployees);
       localStorage.setItem(employeesStorageKey, JSON.stringify(state.employees));
-    } catch (_error) {
+      logInfo('Empleados cargados', { source: 'fetch-json', total: state.employees.length });
+    } catch (error) {
       setEmployees(readStorage(employeesStorageKey, fallbackEmployees));
+      logWarn('No se pudieron cargar empleados por fetch; usando localStorage', {
+        error: errorDetails(error),
+        total: state.employees.length,
+      });
     }
   };
 
@@ -771,9 +1632,14 @@
         applyVacationData(vacationData);
         localStorage.setItem(vacationsStorageKey, JSON.stringify(vacationData));
         localStorage.setItem(matrixStorageKey, JSON.stringify(state.employeeDayEvents));
+        logInfo('Vacaciones cargadas', { source: 'archivo-json', summary: vacationDataSummary(vacationData) });
         return;
-      } catch (_error) {
+      } catch (error) {
         applyVacationData(fallbackVacationRecords);
+        logError('No se pudieron cargar vacaciones desde archivo; usando respaldo', {
+          error: errorDetails(error),
+          summary: vacationDataSummary(fallbackVacationRecords),
+        });
         return;
       }
     }
@@ -784,8 +1650,44 @@
       applyVacationData(vacationData);
       localStorage.setItem(vacationsStorageKey, JSON.stringify(vacationData));
       localStorage.setItem(matrixStorageKey, JSON.stringify(state.employeeDayEvents));
-    } catch (_error) {
+      logInfo('Vacaciones cargadas', { source: 'fetch-json', summary: vacationDataSummary(vacationData) });
+    } catch (error) {
       applyVacationData(readStorage(vacationsStorageKey, fallbackVacationRecords));
+      logWarn('No se pudieron cargar vacaciones por fetch; usando localStorage', {
+        error: errorDetails(error),
+        summary: vacationDataSummary(readStorage(vacationsStorageKey, fallbackVacationRecords)),
+      });
+    }
+  };
+
+  const loadEmployeeDatabase = async () => {
+    if (window.vacacionesData?.getEmployeeDatabase) {
+      try {
+        state.employeeDatabase = normalizeEmployeeDatabaseData(await window.vacacionesData.getEmployeeDatabase());
+        localStorage.setItem(employeeDatabaseStorageKey, JSON.stringify(state.employeeDatabase));
+        logInfo('Expedientes cargados', { source: 'archivo-json', summary: employeeDatabaseSummary() });
+        return;
+      } catch (error) {
+        state.employeeDatabase = normalizeEmployeeDatabaseData(readStorage(employeeDatabaseStorageKey, emptyEmployeeDatabase()));
+        logError('No se pudieron cargar expedientes desde archivo; usando localStorage', {
+          error: errorDetails(error),
+          summary: employeeDatabaseSummary(),
+        });
+        return;
+      }
+    }
+
+    try {
+      const response = await fetch('empleados_bd.json');
+      state.employeeDatabase = normalizeEmployeeDatabaseData(await response.json());
+      localStorage.setItem(employeeDatabaseStorageKey, JSON.stringify(state.employeeDatabase));
+      logInfo('Expedientes cargados', { source: 'fetch-json', summary: employeeDatabaseSummary() });
+    } catch (error) {
+      state.employeeDatabase = normalizeEmployeeDatabaseData(readStorage(employeeDatabaseStorageKey, emptyEmployeeDatabase()));
+      logWarn('No se pudieron cargar expedientes por fetch; usando localStorage', {
+        error: errorDetails(error),
+        summary: employeeDatabaseSummary(),
+      });
     }
   };
 
@@ -823,6 +1725,11 @@
 
     if (state.needsVacationDataSave || changedMatrix || changedVacations) {
       await saveVacations();
+      logInfo('Migracion de eventos de vacaciones aplicada', {
+        changedMatrix,
+        changedVacations,
+        needsVacationDataSave: state.needsVacationDataSave,
+      });
     }
   };
 
@@ -830,9 +1737,13 @@
     if (window.vacacionesData?.getConfig) {
       try {
         state.config = await window.vacacionesData.getConfig();
+        logInfo('Configuracion cargada', { source: 'archivo-json' });
         return;
-      } catch (_error) {
+      } catch (error) {
         state.config = defaultConfig;
+        logWarn('No se pudo cargar configuracion desde archivo; usando valores por defecto', {
+          error: errorDetails(error),
+        });
         return;
       }
     }
@@ -840,8 +1751,12 @@
     try {
       const response = await fetch('configuracion.json');
       state.config = await response.json();
-    } catch (_error) {
+      logInfo('Configuracion cargada', { source: 'fetch-json' });
+    } catch (error) {
       state.config = defaultConfig;
+      logWarn('No se pudo cargar configuracion por fetch; usando valores por defecto', {
+        error: errorDetails(error),
+      });
     }
   };
 
@@ -857,6 +1772,8 @@
     schedulesPage.classList.toggle('active-page', state.view === 'schedules');
     employeesPage.classList.toggle('hidden', state.view !== 'employees');
     employeesPage.classList.toggle('active-page', state.view === 'employees');
+    employeeDatabasePage.classList.toggle('hidden', state.view !== 'employee-database');
+    employeeDatabasePage.classList.toggle('active-page', state.view === 'employee-database');
 
     viewButtons.forEach((button) => {
       button.classList.toggle('active', button.dataset.view === state.view);
@@ -936,6 +1853,7 @@
     const daysInMonth = new Date(state.year, state.month + 1, 0).getDate();
     const days = Array.from({ length: daysInMonth }, (_item, index) => index + 1);
     const weekdayInitials = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+    const matrixRefDate = new Date(state.year, state.month + 1, 0);
 
     matrixTitle.textContent = `Cuadricula de ${monthNames[state.month]} ${state.year}`;
 
@@ -959,7 +1877,7 @@
       ${state.employees
         .map((employee) => {
           const name = escapeHtml(employeeName(employee));
-          const remainingDays = remainingVacationDaysForEmployee(employee);
+          const remainingDays = remainingVacationDaysForEmployee(employee, matrixRefDate);
           return `
             <div class="matrix-employee" title="${name}">
               <span>${name}</span>
@@ -1070,6 +1988,87 @@
             .join('');
   };
 
+  const renderEmployeeDatabase = () => {
+    renderEmployeeDatabaseSortControls();
+
+    const currentEmployeeIds = new Set(state.employees.map((employee) => String(employee.id)));
+    const filterMonth = state.birthdayMonthFilter;
+
+    const filteredEmployees = filterMonth != null
+      ? state.employees.filter((employee) => {
+          const birthDate = employeeBirthDate(employee);
+          if (!birthDate) return false;
+          const parts = dateParts(birthDate);
+          return parts && parts.month - 1 === filterMonth;
+        })
+      : state.employees;
+
+    const detailsCount = state.employeeDatabase.empleados.filter((detail) =>
+      currentEmployeeIds.has(String(detail.id_empleado))
+    ).length;
+
+    if (filterMonth != null) {
+      employeeDatabaseCount.textContent = `${filteredEmployees.length} con cumpleaños en ${monthNames[filterMonth]} · ${detailsCount} expedientes de ${state.employees.length} empleados`;
+    } else {
+      employeeDatabaseCount.textContent = `${detailsCount} expedientes de ${state.employees.length} empleados`;
+    }
+
+    if (state.employees.length === 0) {
+      employeeDatabaseTableBody.innerHTML =
+        '<tr><td colspan="11" class="employees-empty">No hay empleados registrados.</td></tr>';
+      return;
+    }
+
+    if (filteredEmployees.length === 0) {
+      const monthLabel = filterMonth != null ? monthNames[filterMonth] : '';
+      employeeDatabaseTableBody.innerHTML =
+        `<tr><td colspan="11" class="employees-empty">Ningún empleado cumple años en ${monthLabel}.</td></tr>`;
+      return;
+    }
+
+    const employeeRows = sortedEmployeeDatabaseRows(filteredEmployees.map(employeeDatabaseRowData));
+
+    employeeDatabaseTableBody.innerHTML = employeeRows
+      .map((row) => {
+        const {
+          employee,
+          detail,
+          age,
+          birthdayLabel,
+          positionLabel,
+          storeLabel,
+          phoneLabel,
+          allergyLabel,
+        } = row;
+        const statusClass = detail ? 'database-status complete' : 'database-status';
+        const statusText = detail ? 'Completo' : 'Sin expediente';
+        const buttonText = detail ? 'Editar' : 'Agregar';
+
+        return `
+          <tr class="employee-database-row" data-employee-id="${employee.id}" title="Click para editar expediente">
+            <td>
+              <strong>${escapeHtml(employeeName(employee))}</strong>
+              <span class="database-subtext">#${escapeHtml(employee.id)}</span>
+              <span class="${statusClass}">${statusText}</span>
+            </td>
+            <td>${detail?.curp ? escapeHtml(detail.curp) : '<span class="database-muted">-</span>'}</td>
+            <td>${age !== '' ? `${age} a&ntilde;os` : '<span class="database-muted">-</span>'}</td>
+            <td>${birthdayLabel ? `<span class="birthday-date-badge">&#127874; ${escapeHtml(birthdayLabel)}</span>` : '<span class="database-muted">-</span>'}</td>
+            <td>${detail?.estado_civil ? escapeHtml(detail.estado_civil) : '<span class="database-muted">-</span>'}</td>
+            <td>${detail?.tipo_sangre ? escapeHtml(detail.tipo_sangre) : '<span class="database-muted">-</span>'}</td>
+            <td>${positionLabel ? escapeHtml(positionLabel) : '<span class="database-muted">-</span>'}</td>
+            <td>${storeLabel ? escapeHtml(storeLabel) : '<span class="database-muted">-</span>'}</td>
+            <td>${phoneLabel || '<span class="database-muted">-</span>'}</td>
+            <td>${allergyLabel ? escapeHtml(allergyLabel) : '<span class="database-muted">-</span>'}</td>
+            <td>
+              <button class="employee-table-action employee-database-edit-button" type="button" data-employee-id="${employee.id}">${buttonText}</button>
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+  };
+
   const renderControls = () => {
     yearTitle.textContent = state.year;
     monthButtons.forEach((button) => {
@@ -1084,6 +2083,7 @@
     renderMatrix();
     renderSchedules();
     renderEmployees();
+    renderEmployeeDatabase();
   };
 
   const openDayModal = (date) => {
@@ -1093,7 +2093,7 @@
     dayModalTitle.textContent = `${day} de ${monthNames[month - 1]} ${state.year}`;
     dayModalContent.innerHTML =
       entries.length === 0
-        ? '<div class="modal-empty">No hay vacaciones, descansos trabajados ni permisos registrados.</div>'
+        ? '<div class="modal-empty">No hay eventos registrados.</div>'
         : entries
             .map(
               (entry) => `
@@ -1150,6 +2150,213 @@
     state.editingEmployeeId = null;
   };
 
+  const renderEmployeeDatabaseOptions = () => {
+    employeeDatabaseEmployeeInput.innerHTML = state.employees
+      .map((employee) => `<option value="${escapeHtml(employee.id)}">${escapeHtml(employeeName(employee))}</option>`)
+      .join('');
+    employeeAreaOptions.innerHTML = state.employeeDatabase.areas
+      .map((area) => `<option value="${escapeHtml(area.nombre_area)}"></option>`)
+      .join('');
+    employeePositionOptions.innerHTML = state.employeeDatabase.puestos
+      .map((position) => `<option value="${escapeHtml(position.nombre_puesto)}"></option>`)
+      .join('');
+    employeeStoreOptions.innerHTML = state.employeeDatabase.tiendas
+      .map((store) => `<option value="${escapeHtml(store.nombre_tienda)}"></option>`)
+      .join('');
+  };
+
+  const fillEmployeeDatabaseForm = (employeeId) => {
+    const employee = state.employees.find((item) => String(item.id) === String(employeeId));
+
+    if (!employee) {
+      return;
+    }
+
+    const detail = employeeDatabaseDetailById(employee.id);
+    const position = detail?.id_puesto
+      ? databaseRowById(state.employeeDatabase.puestos, 'id_puesto', detail.id_puesto)
+      : null;
+    const area = position?.id_area
+      ? databaseRowById(state.employeeDatabase.areas, 'id_area', position.id_area)
+      : null;
+    const store = detail?.id_tienda
+      ? databaseRowById(state.employeeDatabase.tiendas, 'id_tienda', detail.id_tienda)
+      : null;
+    const phoneInputs = employeeDatabasePhoneInputs();
+
+    state.editingEmployeeDatabaseEmployeeId = employee.id;
+    employeeDatabaseForm.reset();
+    employeeDatabaseEmployeeInput.value = employee.id;
+    employeeDatabaseModalKicker.textContent = `Empleado #${employee.id}`;
+    employeeDatabaseModalTitle.textContent = employeeName(employee);
+    employeeDatabaseSubmit.textContent = detail ? 'Guardar cambios' : 'Guardar expediente';
+    employeeDatabaseCurpInput.value = detail?.curp || '';
+    employeeDatabaseBirthDateInput.value = detail?.fecha_nacimiento || '';
+    employeeDatabaseCivilStatusInput.value = detail?.estado_civil || '';
+    employeeDatabaseBloodTypeInput.value = detail?.tipo_sangre || '';
+    employeeDatabaseAddressInput.value = detail?.direccion || '';
+    employeeDatabaseEmailInput.value = detail?.correo || '';
+    employeeDatabaseSchoolingInput.value = detail?.escolaridad || '';
+    employeeDatabaseChildrenInput.value = detail?.num_hijos ?? 0;
+    employeeDatabaseAreaInput.value = area?.nombre_area || '';
+    employeeDatabasePositionInput.value = position?.nombre_puesto || '';
+    employeeDatabaseStoreInput.value = store?.nombre_tienda || '';
+    employeeDatabaseStoreAddressInput.value = store?.direccion_tienda || '';
+    employeeDatabaseAccountInput.value = detail?.num_cuenta || '';
+    employeeDatabaseCardInput.value = detail?.num_tarjeta || '';
+
+    Object.values(phoneInputs).forEach((input) => {
+      input.value = '';
+    });
+    employeeDatabasePhonesForEmployee(employee.id).forEach((phone) => {
+      if (phoneInputs[phone.tipo]) {
+        phoneInputs[phone.tipo].value = phone.numero;
+      }
+    });
+    employeeDatabaseAllergiesInput.value = employeeDatabaseAllergiesForEmployee(employee.id)
+      .map((allergy) => allergy.descripcion)
+      .join('\n');
+  };
+
+  const openEmployeeDatabaseModal = (employeeId = null) => {
+    if (state.employees.length === 0) {
+      window.alert('Primero agrega un empleado.');
+      return;
+    }
+
+    renderEmployeeDatabaseOptions();
+    fillEmployeeDatabaseForm(employeeId ?? state.employees[0].id);
+    employeeDatabaseModal.classList.remove('hidden');
+    employeeDatabaseCurpInput.focus();
+  };
+
+  const closeEmployeeDatabaseModal = () => {
+    employeeDatabaseModal.classList.add('hidden');
+    state.editingEmployeeDatabaseEmployeeId = null;
+  };
+
+  const saveEmployeeDatabaseFromForm = async () => {
+    const employeeId = positiveIntegerOrNull(employeeDatabaseEmployeeInput.value);
+    const employee = state.employees.find((item) => String(item.id) === String(employeeId));
+
+    if (!employee) {
+      window.alert('Selecciona un empleado valido.');
+      return;
+    }
+
+    const curp = trimmedText(employeeDatabaseCurpInput.value, 18).toUpperCase();
+    const birthDate = normalizeDateString(employeeDatabaseBirthDateInput.value);
+
+    if (curp.length !== 18) {
+      window.alert('La CURP debe tener 18 caracteres.');
+      employeeDatabaseCurpInput.focus();
+      return;
+    }
+
+    if (!birthDate) {
+      window.alert('Selecciona la fecha de nacimiento.');
+      employeeDatabaseBirthDateInput.focus();
+      return;
+    }
+
+    const detailBase = normalizeEmployeeDatabaseEmployee({
+      id_empleado: employee.id,
+      nombre: employeeName(employee),
+      curp,
+      fecha_nacimiento: birthDate,
+      estado_civil: employeeDatabaseCivilStatusInput.value,
+      tipo_sangre: employeeDatabaseBloodTypeInput.value,
+      direccion: employeeDatabaseAddressInput.value,
+      correo: employeeDatabaseEmailInput.value,
+      num_cuenta: employeeDatabaseAccountInput.value,
+      num_tarjeta: employeeDatabaseCardInput.value,
+      escolaridad: employeeDatabaseSchoolingInput.value,
+      num_hijos: employeeDatabaseChildrenInput.value,
+      fecha_ingreso: employee.fecha_ingreso,
+      salario: employee.salario_diario,
+    });
+
+    if (!validateEmployeeDatabaseUniqueFields(detailBase)) {
+      return;
+    }
+
+    const areaId = upsertDatabaseArea(employeeDatabaseAreaInput.value);
+    const positionId = upsertDatabasePosition(employeeDatabasePositionInput.value, areaId);
+    const storeId = upsertDatabaseStore(employeeDatabaseStoreInput.value, employeeDatabaseStoreAddressInput.value);
+    const detail = {
+      ...detailBase,
+      id_puesto: positionId,
+      id_tienda: storeId,
+    };
+    const existingDetail = employeeDatabaseDetailById(employee.id);
+
+    if (existingDetail) {
+      state.employeeDatabase.empleados = state.employeeDatabase.empleados.map((item) =>
+        String(item.id_empleado) === String(employee.id) ? detail : item,
+      );
+    } else {
+      state.employeeDatabase.empleados.push(detail);
+    }
+
+    const previousPhonesByType = new Map(
+      employeeDatabasePhonesForEmployee(employee.id).map((phone) => [phone.tipo, phone]),
+    );
+    let nextPhoneId = nextDatabaseId(state.employeeDatabase.telefonos, 'id_telefono');
+    const newPhones = employeePhoneTypes
+      .map((type) => {
+        const numero = trimmedText(employeeDatabasePhoneInputs()[type].value, 20);
+
+        if (!numero) {
+          return null;
+        }
+
+        return {
+          id_telefono: previousPhonesByType.get(type)?.id_telefono ?? nextPhoneId++,
+          id_empleado: employee.id,
+          numero,
+          tipo: type,
+        };
+      })
+      .filter(Boolean);
+
+    state.employeeDatabase.telefonos = [
+      ...state.employeeDatabase.telefonos.filter((phone) => String(phone.id_empleado) !== String(employee.id)),
+      ...newPhones,
+    ];
+
+    const allergyDescriptions = [
+      ...new Set(
+        employeeDatabaseAllergiesInput.value
+          .split(/\r?\n/)
+          .map((line) => trimmedText(line, 120))
+          .filter(Boolean),
+      ),
+    ];
+    const previousAllergies = employeeDatabaseAllergiesForEmployee(employee.id);
+    let nextAllergyId = nextDatabaseId(state.employeeDatabase.alergias, 'id_alergia');
+    const newAllergies = allergyDescriptions.map((description, index) => ({
+      id_alergia: previousAllergies[index]?.id_alergia ?? nextAllergyId++,
+      id_empleado: employee.id,
+      descripcion,
+    }));
+
+    state.employeeDatabase.alergias = [
+      ...state.employeeDatabase.alergias.filter((allergy) => String(allergy.id_empleado) !== String(employee.id)),
+      ...newAllergies,
+    ];
+
+    await saveEmployeeDatabase();
+    logInfo('Expediente de empleado guardado', {
+      employeeId: employee.id,
+      action: existingDetail ? 'actualizado' : 'creado',
+      employeeName: employeeName(employee),
+      phones: newPhones.length,
+      allergies: newAllergies.length,
+    });
+    closeEmployeeDatabaseModal();
+    renderAll();
+  };
+
   const setScheduleTimeInputsEnabled = () => {
     const isWorkday = scheduleTypeInput.value === 'work';
     scheduleStartInput.disabled = !isWorkday;
@@ -1204,6 +2411,13 @@
     }
 
     await saveEmployees();
+    logInfo('Horario guardado', {
+      employeeId: employee.id,
+      employeeName: employeeName(employee),
+      day,
+      type: scheduleTypeInput.value === 'rest' ? 'descanso' : 'laboral',
+      hours: employee.horario[day] || null,
+    });
     closeScheduleModal();
     renderSchedules();
   };
@@ -1235,12 +2449,24 @@
       state.employees.push(employee);
     }
 
+    const employeeDatabaseChanged = syncEmployeeDatabaseCoreFields(employee);
     await saveEmployees();
+    if (employeeDatabaseChanged) {
+      await saveEmployeeDatabase();
+    }
+    logInfo('Empleado guardado', {
+      employeeId: employee.id,
+      action: existing ? 'actualizado' : 'creado',
+      employeeName: employeeName(employee),
+      employeeDatabaseChanged,
+    });
     closeEmployeeModal();
     renderAll();
   };
 
   const deleteEmployee = async (employeeId) => {
+    const deletedEmployee = state.employees.find((employee) => String(employee.id) === String(employeeId));
+    const employeeDatabaseChanged = removeEmployeeDatabaseRecord(employeeId);
     state.employees = state.employees.filter((employee) => String(employee.id) !== String(employeeId));
     delete state.vacationsByEmployeeId[String(employeeId)];
 
@@ -1253,6 +2479,14 @@
     saveMatrixEvents();
     await saveEmployees();
     await saveVacations();
+    if (employeeDatabaseChanged) {
+      await saveEmployeeDatabase();
+    }
+    logWarn('Empleado eliminado', {
+      employeeId,
+      employeeName: deletedEmployee ? employeeName(deletedEmployee) : null,
+      employeeDatabaseChanged,
+    });
     renderAll();
   };
 
@@ -1276,6 +2510,14 @@
 
     saveMatrixEvents();
     await saveVacations();
+    logInfo('Dia de empleado actualizado', {
+      employeeId,
+      employeeName: employee ? employeeName(employee) : null,
+      date,
+      previousReason: currentReason || null,
+      nextReason: nextReason?.id || null,
+      nextReasonLabel: nextReason?.label || 'Sin registro',
+    });
     renderMatrix();
     renderCalendar();
     renderEmployees();
@@ -1295,25 +2537,31 @@
       try {
         await reloadSyncedData();
         await refreshSyncStatus();
-      } catch (_error) {
+        logInfo('Datos actualizados desde la nube');
+      } catch (error) {
+        logError('No se pudieron recargar datos de la nube', { error: errorDetails(error) });
         updateSyncStatus({ enabled: true, lastError: 'No se pudieron recargar los datos de la nube.' });
       }
     });
 
     syncStatusButton?.addEventListener('click', async () => {
+      logInfo('Sincronizacion manual iniciada');
       syncStatusButton.disabled = true;
       updateSyncStatus({
         enabled: true,
         datasets: {
           employees: { syncing: true },
           vacations: { syncing: true },
+          employeeDatabase: { syncing: true },
         },
       });
 
       try {
         updateSyncStatus(await window.vacacionesData.syncNow());
         await reloadSyncedData();
-      } catch (_error) {
+        logInfo('Sincronizacion manual terminada');
+      } catch (error) {
+        logError('No se pudo sincronizar manualmente', { error: errorDetails(error) });
         updateSyncStatus({ enabled: true, lastError: 'No se pudo sincronizar ahora.' });
       } finally {
         syncStatusButton.disabled = false;
@@ -1328,6 +2576,7 @@
       [matrixStorageKey]: 'matrix',
       [employeesStorageKey]: 'employees',
       [vacationsStorageKey]: 'vacations',
+      [employeeDatabaseStorageKey]: 'employeeDatabase',
       [themeStorageKey]: 'theme',
     };
 
@@ -1371,6 +2620,7 @@
       button.addEventListener('click', () => {
         applyTheme(button.dataset.theme);
         saveTheme(state.theme);
+        logInfo('Tema cambiado', { theme: state.theme });
       });
     });
 
@@ -1400,16 +2650,37 @@
       }
 
       event.preventDefault();
+      const deletedNotes = state.events[cell.dataset.date]?.length || 0;
       delete state.events[cell.dataset.date];
       saveCalendarEvents();
+      logInfo('Eventos manuales de calendario eliminados', {
+        date: cell.dataset.date,
+        deletedNotes,
+      });
       renderCalendar();
     });
 
     closeDayModalButton.addEventListener('click', closeDayModal);
     closeEmployeeModalButton.addEventListener('click', closeEmployeeModal);
     closeScheduleModalButton.addEventListener('click', closeScheduleModal);
+    closeEmployeeDatabaseModalButton.addEventListener('click', closeEmployeeDatabaseModal);
     addEmployeeButton.addEventListener('click', () => openEmployeeModal());
+    addEmployeeDatabaseButton.addEventListener('click', () => openEmployeeDatabaseModal());
     scheduleTypeInput.addEventListener('change', setScheduleTimeInputsEnabled);
+    employeeDatabaseEmployeeInput.addEventListener('change', () => {
+      fillEmployeeDatabaseForm(employeeDatabaseEmployeeInput.value);
+    });
+
+    birthdayMonthFilterInput?.addEventListener('change', () => {
+      state.birthdayMonthFilter = birthdayMonthFilterInput.value !== '' ? Number(birthdayMonthFilterInput.value) : null;
+      renderEmployeeDatabase();
+    });
+
+    employeeDatabaseSortButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        setEmployeeDatabaseSort(button.dataset.sortKey);
+      });
+    });
 
     dayModal.addEventListener('click', (event) => {
       if (event.target === dayModal) {
@@ -1429,6 +2700,12 @@
       }
     });
 
+    employeeDatabaseModal.addEventListener('click', (event) => {
+      if (event.target === employeeDatabaseModal) {
+        closeEmployeeDatabaseModal();
+      }
+    });
+
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !dayModal.classList.contains('hidden')) {
         closeDayModal();
@@ -1440,6 +2717,10 @@
 
       if (event.key === 'Escape' && !scheduleModal.classList.contains('hidden')) {
         closeScheduleModal();
+      }
+
+      if (event.key === 'Escape' && !employeeDatabaseModal.classList.contains('hidden')) {
+        closeEmployeeDatabaseModal();
       }
     });
 
@@ -1466,9 +2747,24 @@
       await saveEmployeeFromForm();
     });
 
+    employeeDatabaseForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      await saveEmployeeDatabaseFromForm();
+    });
+
     scheduleForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       await saveScheduleFromForm();
+    });
+
+    employeeDatabaseTableBody.addEventListener('click', (event) => {
+      const button = event.target.closest('.employee-database-edit-button');
+      const row = event.target.closest('.employee-database-row');
+      const employeeId = button?.dataset.employeeId || row?.dataset.employeeId;
+
+      if (employeeId) {
+        openEmployeeDatabaseModal(employeeId);
+      }
     });
 
     employeesTableBody.addEventListener('click', async (event) => {
@@ -1487,11 +2783,13 @@
   };
 
   const init = async () => {
+    logInfo('Interfaz iniciando');
     applyTheme(readTheme());
     state.events = readStorage(calendarStorageKey, {});
     state.employeeDayEvents = readStorage(matrixStorageKey, {});
     await loadConfig();
     await loadEmployees();
+    await loadEmployeeDatabase();
     await loadVacations();
     await migrateMatrixVacationEvents();
     bindEvents();
@@ -1499,7 +2797,14 @@
     bindLiveSyncEvents();
     renderAll();
     await refreshSyncStatus();
+    logInfo('Interfaz lista', {
+      employees: state.employees.length,
+      employeeDatabase: employeeDatabaseSummary(),
+      vacations: vacationDataSummary(vacationDataFromState()),
+    });
   };
 
-  init();
+  init().catch((error) => {
+    logError('No se pudo iniciar la interfaz', { error: errorDetails(error) });
+  });
 })();

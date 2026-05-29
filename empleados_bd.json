@@ -1,0 +1,34 @@
+{
+  "empleados": [
+    {
+      "id_empleado": 50,
+      "nombre": "DEMIAN TELLEZ CALZADA",
+      "curp": "TECD060228HMNLLMA0",
+      "fecha_nacimiento": "2006-02-28",
+      "estado_civil": "Soltero",
+      "tipo_sangre": "",
+      "direccion": "",
+      "correo": "",
+      "num_cuenta": "",
+      "num_tarjeta": "",
+      "escolaridad": "",
+      "num_hijos": 0,
+      "fecha_ingreso": "2025-10-14",
+      "salario": 400,
+      "id_puesto": null,
+      "id_tienda": null
+    }
+  ],
+  "puestos": [],
+  "areas": [],
+  "tiendas": [],
+  "telefonos": [],
+  "alergias": [],
+  "__sync": {
+    "version": 1,
+    "dataset": "employeeDatabase",
+    "source": "b34a2967-e8a2-464e-9e06-3288d5168332",
+    "updatedAt": "2026-05-29T15:24:44.888Z",
+    "pendingUpload": false
+  }
+}

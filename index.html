@@ -1,4 +1,4 @@
-2<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -31,6 +31,7 @@
         <button class="view-button" type="button" data-view="matrix">Cuadricula</button>
         <button class="view-button" type="button" data-view="schedules">Horarios</button>
         <button class="view-button" type="button" data-view="employees">Empleados</button>
+        <button class="view-button" type="button" data-view="employee-database">Expediente</button>
       </div>
 
       <div id="toolbar-actions">
@@ -133,6 +134,61 @@
       </div>
     </section>
 
+    <section id="employee-database-page" class="page hidden">
+      <div class="employees-layout">
+        <section class="employee-panel employee-list-panel">
+          <div class="employee-panel-header">
+            <div>
+              <h2>Expediente empleados</h2>
+              <p id="employee-database-count">0 expedientes</p>
+            </div>
+            <div class="employee-panel-header-actions">
+              <label class="birthday-filter-label">
+                <span>🎂 Cumpleaños en</span>
+                <select id="birthday-month-filter" class="birthday-filter-select">
+                  <option value="">Todos los meses</option>
+                  <option value="0">Enero</option>
+                  <option value="1">Febrero</option>
+                  <option value="2">Marzo</option>
+                  <option value="3">Abril</option>
+                  <option value="4">Mayo</option>
+                  <option value="5">Junio</option>
+                  <option value="6">Julio</option>
+                  <option value="7">Agosto</option>
+                  <option value="8">Septiembre</option>
+                  <option value="9">Octubre</option>
+                  <option value="10">Noviembre</option>
+                  <option value="11">Diciembre</option>
+                </select>
+              </label>
+              <button id="add-employee-database-button" class="employee-submit" type="button">Agregar expediente</button>
+            </div>
+          </div>
+
+          <div class="employees-table-wrap">
+            <table class="employees-table employee-database-table">
+              <thead>
+                <tr>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="employee">Empleado<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="curp">CURP<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="age">Edad<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="birthday">Cumplea&ntilde;os<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="status">Estado<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="blood">Sangre<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="position">Puesto<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="store">Tienda<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="phones">Telefonos<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="allergies">Alergias<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="employee-database-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
   </div>
 
   <div id="day-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="day-modal-title">
@@ -221,6 +277,141 @@
         </div>
 
         <button class="employee-submit" type="submit">Guardar horario</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="employee-database-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="employee-database-modal-title">
+    <div class="modal employee-database-modal">
+      <div class="modal-header">
+        <div>
+          <p id="employee-database-modal-kicker">Expediente</p>
+          <h2 id="employee-database-modal-title">Editar expediente</h2>
+        </div>
+        <button id="close-employee-database-modal" class="modal-close" type="button" aria-label="Cerrar"></button>
+      </div>
+
+      <form id="employee-database-form" class="employee-modal-body">
+        <datalist id="employee-area-options"></datalist>
+        <datalist id="employee-position-options"></datalist>
+        <datalist id="employee-store-options"></datalist>
+
+        <div class="employee-form-section">
+          <h3>Empleado</h3>
+          <div class="employee-form-grid">
+            <label class="employee-wide-field">
+              <span>Empleado</span>
+              <select id="employee-database-employee" required></select>
+            </label>
+            <label>
+              <span>CURP</span>
+              <input id="employee-database-curp" type="text" maxlength="18" autocomplete="off" required>
+            </label>
+            <label>
+              <span>Fecha de nacimiento</span>
+              <input id="employee-database-birth-date" type="date" required>
+            </label>
+            <label>
+              <span>Estado civil</span>
+              <select id="employee-database-civil-status">
+                <option value=""></option>
+                <option value="Soltero">Soltero</option>
+                <option value="Casado">Casado</option>
+                <option value="Divorciado">Divorciado</option>
+                <option value="Viudo">Viudo</option>
+                <option value="Union Libre">Union Libre</option>
+              </select>
+            </label>
+            <label>
+              <span>Tipo de sangre</span>
+              <select id="employee-database-blood-type">
+                <option value=""></option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+              </select>
+            </label>
+            <label class="employee-wide-field">
+              <span>Direccion</span>
+              <input id="employee-database-address" type="text" maxlength="255" autocomplete="off">
+            </label>
+            <label>
+              <span>Correo</span>
+              <input id="employee-database-email" type="email" maxlength="120" autocomplete="off">
+            </label>
+            <label>
+              <span>Escolaridad</span>
+              <input id="employee-database-schooling" type="text" maxlength="50" autocomplete="off">
+            </label>
+            <label>
+              <span>Numero de hijos</span>
+              <input id="employee-database-children" type="number" min="0" max="99" step="1" value="0">
+            </label>
+          </div>
+        </div>
+
+        <div class="employee-form-section">
+          <h3>Trabajo</h3>
+          <div class="employee-form-grid">
+            <label>
+              <span>Area</span>
+              <input id="employee-database-area" list="employee-area-options" type="text" maxlength="80" autocomplete="off">
+            </label>
+            <label>
+              <span>Puesto</span>
+              <input id="employee-database-position" list="employee-position-options" type="text" maxlength="80" autocomplete="off">
+            </label>
+            <label>
+              <span>Tienda</span>
+              <input id="employee-database-store" list="employee-store-options" type="text" maxlength="80" autocomplete="off">
+            </label>
+            <label>
+              <span>Direccion tienda</span>
+              <input id="employee-database-store-address" type="text" maxlength="255" autocomplete="off">
+            </label>
+            <label>
+              <span>Cuenta bancaria</span>
+              <input id="employee-database-account" type="text" maxlength="20" autocomplete="off">
+            </label>
+            <label>
+              <span>Tarjeta</span>
+              <input id="employee-database-card" type="text" maxlength="20" autocomplete="off">
+            </label>
+          </div>
+        </div>
+
+        <div class="employee-form-section">
+          <h3>Contacto</h3>
+          <div class="employee-form-grid">
+            <label>
+              <span>Telefono personal</span>
+              <input id="employee-database-phone-personal" type="text" maxlength="20" autocomplete="off">
+            </label>
+            <label>
+              <span>Emergencia 1</span>
+              <input id="employee-database-phone-emergency-1" type="text" maxlength="20" autocomplete="off">
+            </label>
+            <label>
+              <span>Emergencia 2</span>
+              <input id="employee-database-phone-emergency-2" type="text" maxlength="20" autocomplete="off">
+            </label>
+            <label>
+              <span>Casa</span>
+              <input id="employee-database-phone-home" type="text" maxlength="20" autocomplete="off">
+            </label>
+            <label class="employee-wide-field">
+              <span>Alergias</span>
+              <textarea id="employee-database-allergies" rows="4"></textarea>
+            </label>
+          </div>
+        </div>
+
+        <button id="employee-database-submit" class="employee-submit" type="submit">Guardar expediente</button>
       </form>
     </div>
   </div>

@@ -52,6 +52,12 @@
   --note-bg: #edf2f0;
   --note-border: #d5ddd7;
   --note-text: #3f5148;
+  --birthday-bg: #fff0f6;
+  --birthday-border: #ffd0e3;
+  --birthday-text: #b2336c;
+  --anniversary-bg: #ecf7ff;
+  --anniversary-border: #c6e3f6;
+  --anniversary-text: #2e6f95;
 }
 
 :root[data-theme="dark"] {
@@ -101,6 +107,12 @@
   --note-bg: #d8e1db;
   --note-border: #aebbb2;
   --note-text: #17211c;
+  --birthday-bg: #ffd3e5;
+  --birthday-border: #f09bc0;
+  --birthday-text: #32101f;
+  --anniversary-bg: #c8e9ff;
+  --anniversary-border: #83c5ec;
+  --anniversary-text: #102433;
 }
 
 html,
@@ -198,6 +210,7 @@ textarea:focus-visible {
 .sync-status,
 .employee-submit,
 .delete-employee-button,
+.employee-table-action,
 .modal-close {
   transition:
     background-color 0.18s ease,
@@ -920,6 +933,29 @@ button.cell:hover {
   color: var(--note-text);
 }
 
+.reason-birthday {
+  background: var(--birthday-bg);
+  border-color: var(--birthday-border);
+  color: var(--birthday-text);
+}
+
+.reason-birthday b {
+  font-size: 14px;
+  width: 20px;
+  height: 20px;
+  background: none;
+}
+
+.modal-reason.reason-birthday {
+  font-size: 22px;
+}
+
+.reason-anniversary {
+  background: var(--anniversary-bg);
+  border-color: var(--anniversary-border);
+  color: var(--anniversary-text);
+}
+
 .employees-layout {
   flex: 1;
   min-height: 0;
@@ -941,6 +977,54 @@ button.cell:hover {
   padding: 18px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--header-bg);
+}
+
+.employee-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.birthday-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.birthday-filter-select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(20, 34, 27, 0.08);
+}
+
+.birthday-filter-select:hover {
+  background: var(--hover);
+}
+
+.birthday-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid var(--birthday-border);
+  border-radius: 999px;
+  background: var(--birthday-bg);
+  color: var(--birthday-text);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .employee-panel-header h2 {
@@ -986,12 +1070,25 @@ button.cell:hover {
   resize: vertical;
 }
 
-.employee-comment-field {
+.employee-comment-field,
+.employee-wide-field {
   grid-column: 1 / -1;
 }
 
+.employee-form-section {
+  display: grid;
+  gap: 12px;
+}
+
+.employee-form-section h3 {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
 .employee-submit,
-.delete-employee-button {
+.delete-employee-button,
+.employee-table-action {
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1003,7 +1100,8 @@ button.cell:hover {
 }
 
 .employee-submit:hover,
-.delete-employee-button:hover {
+.delete-employee-button:hover,
+.employee-table-action:hover {
   background: var(--hover);
   transform: translateY(-1px);
 }
@@ -1015,6 +1113,10 @@ button.cell:hover {
 .delete-employee-button {
   color: var(--danger-text);
   border-color: var(--danger-border);
+}
+
+.employee-table-action {
+  white-space: nowrap;
 }
 
 .employees-table-wrap {
@@ -1047,8 +1149,56 @@ button.cell:hover {
   font-weight: 800;
 }
 
+.table-sort-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.table-sort-button:hover,
+.table-sort-button.active {
+  color: var(--text);
+}
+
+.sort-indicator {
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+  opacity: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+
+.table-sort-button.active .sort-indicator {
+  opacity: 1;
+}
+
+.table-sort-button[data-sort-direction="asc"] .sort-indicator {
+  border-bottom: 6px solid currentColor;
+}
+
+.table-sort-button[data-sort-direction="desc"] .sort-indicator {
+  border-top: 6px solid currentColor;
+}
+
 .employees-table td {
   color: var(--text);
+}
+
+.employee-database-table {
+  min-width: 1360px;
+}
+
+.employee-database-table td {
+  vertical-align: middle;
 }
 
 .employee-row {
@@ -1073,6 +1223,37 @@ button.cell:hover {
   background: var(--panel-muted);
   color: var(--text);
   font-weight: 800;
+}
+
+.database-subtext,
+.database-muted {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.database-muted {
+  margin-top: 0;
+}
+
+.database-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-muted);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.database-status.complete {
+  border-color: color-mix(in srgb, var(--sync-ok) 28%, var(--border));
+  background: color-mix(in srgb, var(--sync-ok) 10%, var(--panel-muted));
+  color: color-mix(in srgb, var(--sync-ok) 74%, var(--text));
 }
 
 .modal-backdrop {
@@ -1109,6 +1290,11 @@ button.cell:hover {
 
 .schedule-modal {
   width: min(460px, 100%);
+}
+
+.employee-database-modal {
+  width: min(920px, 100%);
+  max-height: min(760px, 92vh);
 }
 
 .modal-header {

@@ -26,6 +26,9 @@ const reasonJsonKeys = {
   P: 'permisos',
 };
 const knownVacationJsonKeys = Object.values(reasonJsonKeys);
+const employeeCivilStatuses = ['Soltero', 'Casado', 'Divorciado', 'Viudo', 'Union Libre'];
+const employeeBloodTypes = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+const employeePhoneTypes = ['Personal', 'Emergencia1', 'Emergencia2', 'Casa'];
 const syncSourceId = randomUUID();
 const syncPollIntervalMs = 600000;
 const syncRequestTimeoutMs = 15000;
@@ -57,6 +60,14 @@ const syncState = {
       lastUploadAt: null,
       lastError: null,
     },
+    employeeDatabase: {
+      label: 'Base empleados',
+      syncing: false,
+      pendingUpload: false,
+      lastDownloadAt: null,
+      lastUploadAt: null,
+      lastError: null,
+    },
   },
 };
 const datasetDefinitions = {
@@ -70,17 +81,138 @@ const datasetDefinitions = {
     fileName: 'vacaciones.json',
     fallback: { vacaciones: [], descansos_trabajados: [], incapacidades: [], permisos: [] },
   },
+  employeeDatabase: {
+    configName: 'EMPLEADOS_BD',
+    fileName: 'empleados_bd.json',
+    fallback: { empleados: [], puestos: [], areas: [], tiendas: [], telefonos: [], alergias: [] },
+  },
 };
 
 const bundledDataFilePath = (fileName) => path.join(__dirname, fileName);
 const dataDirectoryPath = () => (app.isPackaged ? app.getPath('userData') : __dirname);
 const dataFilePath = (fileName) => path.join(dataDirectoryPath(), fileName);
+const logDirectoryPath = () => path.join(dataDirectoryPath(), 'logs');
+const logFilePath = () => path.join(logDirectoryPath(), 'vacaciones.log');
+const previousLogFilePath = () => path.join(logDirectoryPath(), 'vacaciones.previous.log');
+const logLevels = new Set(['debug', 'info', 'warn', 'error']);
+const maxLogFileSizeBytes = 2 * 1024 * 1024;
+const sensitiveLogKeys = new Set([
+  'apikey',
+  'apiendpoint',
+  'authorization',
+  'editkey',
+  'password',
+  'rawendpoint',
+  'secret',
+  'token',
+]);
 const writableDataFileNames = [
   'configapi.txt',
   'configuracion.json',
   ...Object.values(datasetDefinitions).map((definition) => definition.fileName),
 ];
 let writableDataFilesReady = false;
+
+const isSensitiveLogKey = (key) => sensitiveLogKeys.has(String(key).toLowerCase());
+
+const errorToLogDetails = (error) => {
+  if (!error) {
+    return null;
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+    };
+  }
+
+  if (typeof error === 'object') {
+    return safeLogValue(error);
+  }
+
+  return { message: String(error) };
+};
+
+const safeLogValue = (value, depth = 0) => {
+  if (value instanceof Error) {
+    return errorToLogDetails(value);
+  }
+
+  if (value == null || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return value.length > 600 ? `${value.slice(0, 600)}...` : value;
+  }
+
+  if (depth >= 4) {
+    return '[truncated]';
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 25).map((item) => safeLogValue(item, depth + 1));
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .slice(0, 50)
+      .reduce((result, [key, item]) => {
+        result[key] = isSensitiveLogKey(key) ? '[redacted]' : safeLogValue(item, depth + 1);
+        return result;
+      }, {});
+  }
+
+  return String(value);
+};
+
+const rotateLogFileIfNeeded = async () => {
+  try {
+    const stats = await fs.stat(logFilePath());
+
+    if (stats.size < maxLogFileSizeBytes) {
+      return;
+    }
+
+    await fs.rm(previousLogFilePath(), { force: true });
+    await fs.rename(logFilePath(), previousLogFilePath());
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+};
+
+const writeAppLog = async (level, message, details = null) => {
+  const safeLevel = logLevels.has(level) ? level : 'info';
+  const timestamp = new Date().toISOString();
+  const safeMessage = String(message || 'Evento sin mensaje').replace(/\s+/g, ' ').trim();
+  const safeDetails = details == null ? null : safeLogValue(details);
+  const detailsText = safeDetails == null ? '' : ` ${JSON.stringify(safeDetails)}`;
+  const line = `[${timestamp}] [${safeLevel.toUpperCase()}] ${safeMessage}${detailsText}\n`;
+
+  await fs.mkdir(logDirectoryPath(), { recursive: true });
+  await rotateLogFileIfNeeded();
+  await fs.appendFile(logFilePath(), line, 'utf8');
+
+  const consoleMethod = safeLevel === 'error' ? 'error' : safeLevel === 'warn' ? 'warn' : 'log';
+  console[consoleMethod](`[Vacaciones] ${safeMessage}`, safeDetails || '');
+};
+
+const logAppEvent = (level, message, details = null) => {
+  writeAppLog(level, message, details).catch(() => {});
+};
+
+process.on('uncaughtException', (error) => {
+  logAppEvent('error', 'Excepcion no controlada en proceso principal', { error });
+});
+
+process.on('unhandledRejection', (reason) => {
+  logAppEvent('error', 'Promesa rechazada no controlada en proceso principal', { reason });
+});
 
 const ensureWritableDataFile = async (fileName) => {
   if (!app.isPackaged) {
@@ -451,6 +583,11 @@ const applyIncomingDataset = async (datasetKey, data, reason = 'lan-update') => 
   }
 
   await writeDatasetData(datasetKey, incomingData);
+  logAppEvent('info', 'Dataset recibido por sincronizacion', {
+    datasetKey,
+    reason,
+    summary: datasetLogSummary(datasetKey, incomingData),
+  });
 
   const pendingUpload = Boolean(incomingData.__sync?.pendingUpload && apiConfigForDataset(datasetKey));
   setDatasetSyncState(datasetKey, {
@@ -511,7 +648,13 @@ const pullNewerDatasetsFromPeer = async (peer) => {
 
   for (const datasetKey of Object.keys(datasetDefinitions)) {
     if (await shouldPullDatasetFromPeer(datasetKey, versions[datasetKey])) {
-      await pullDatasetFromPeer(peer, datasetKey).catch(() => {});
+      await pullDatasetFromPeer(peer, datasetKey).catch((error) => {
+        logAppEvent('warn', 'No se pudo traer dataset desde equipo LAN', {
+          datasetKey,
+          peer: normalizeIpAddress(peer.address),
+          error,
+        });
+      });
     }
   }
 };
@@ -545,8 +688,12 @@ const broadcastDatasetToLanPeers = async (datasetKey, data) => {
 
   await Promise.allSettled(
     peers.map((peer) =>
-      pushDatasetToPeer(peer, datasetKey, data).catch(() => {
-        // A missed LAN push will be recovered by the next announcement or cloud sync.
+      pushDatasetToPeer(peer, datasetKey, data).catch((error) => {
+        logAppEvent('warn', 'No se pudo enviar dataset a equipo LAN', {
+          datasetKey,
+          peer: normalizeIpAddress(peer.address),
+          error,
+        });
       }),
     ),
   );
@@ -608,6 +755,7 @@ const loadApiConfig = async () => {
     apiConfig = { employees: null, vacations: null };
     syncState.enabled = false;
     syncState.lastError = error.message;
+    logAppEvent('warn', 'No se pudo leer configapi.txt; se usara modo local/LAN', { error });
   }
 
   emitSyncStatus();
@@ -731,6 +879,152 @@ const normalizeEmployeeData = (data = {}) => {
   return normalized;
 };
 
+const trimmedText = (value, maxLength = 255) =>
+  String(value ?? '').trim().slice(0, maxLength);
+
+const positiveIntegerOrNull = (value) => {
+  const number = Number(value);
+
+  return Number.isFinite(number) && number > 0 ? Math.trunc(number) : null;
+};
+
+const normalizeDateString = (value) => {
+  const text = trimmedText(value, 10);
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+};
+
+const normalizeMoney = (value) => {
+  const number = Number(value);
+
+  return Number.isFinite(number) && number >= 0 ? Number(number.toFixed(2)) : 0;
+};
+
+const normalizeCivilStatus = (value) => {
+  const text = trimmedText(value, 20).replace('Uni\u00f3n Libre', 'Union Libre');
+
+  return employeeCivilStatuses.includes(text) ? text : '';
+};
+
+const normalizeBloodType = (value) => {
+  const text = trimmedText(value, 3).toUpperCase();
+
+  return employeeBloodTypes.includes(text) ? text : '';
+};
+
+const normalizeTableById = (rows = [], normalizer, idKey) => {
+  const normalizedById = new Map();
+
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const normalized = normalizer(row);
+
+    if (normalized[idKey] != null) {
+      normalizedById.set(String(normalized[idKey]), normalized);
+    }
+  });
+
+  return [...normalizedById.values()].sort((a, b) => Number(a[idKey]) - Number(b[idKey]));
+};
+
+const normalizeEmployeeDatabaseEmployee = (employee = {}) => ({
+  id_empleado: positiveIntegerOrNull(employee.id_empleado ?? employee.id),
+  nombre: trimmedText(employee.nombre, 100),
+  curp: trimmedText(employee.curp, 18).toUpperCase(),
+  fecha_nacimiento: normalizeDateString(employee.fecha_nacimiento),
+  estado_civil: normalizeCivilStatus(employee.estado_civil),
+  tipo_sangre: normalizeBloodType(employee.tipo_sangre),
+  direccion: trimmedText(employee.direccion, 255),
+  correo: trimmedText(employee.correo, 120).toLowerCase(),
+  num_cuenta: trimmedText(employee.num_cuenta, 20),
+  num_tarjeta: trimmedText(employee.num_tarjeta, 20),
+  escolaridad: trimmedText(employee.escolaridad, 50),
+  num_hijos: Math.max(0, Math.min(99, Number.parseInt(employee.num_hijos, 10) || 0)),
+  fecha_ingreso: normalizeDateString(employee.fecha_ingreso),
+  salario: normalizeMoney(employee.salario),
+  id_puesto: positiveIntegerOrNull(employee.id_puesto),
+  id_tienda: positiveIntegerOrNull(employee.id_tienda),
+});
+
+const normalizeArea = (area = {}) => ({
+  id_area: positiveIntegerOrNull(area.id_area ?? area.id),
+  nombre_area: trimmedText(area.nombre_area ?? area.nombre, 80),
+});
+
+const normalizeStore = (store = {}) => ({
+  id_tienda: positiveIntegerOrNull(store.id_tienda ?? store.id),
+  nombre_tienda: trimmedText(store.nombre_tienda ?? store.nombre, 80),
+  direccion_tienda: trimmedText(store.direccion_tienda ?? store.direccion, 255),
+});
+
+const normalizePosition = (position = {}) => ({
+  id_puesto: positiveIntegerOrNull(position.id_puesto ?? position.id),
+  nombre_puesto: trimmedText(position.nombre_puesto ?? position.nombre, 80),
+  id_area: positiveIntegerOrNull(position.id_area),
+});
+
+const normalizePhone = (phone = {}) => {
+  const type = trimmedText(phone.tipo, 20);
+
+  return {
+    id_telefono: positiveIntegerOrNull(phone.id_telefono ?? phone.id),
+    id_empleado: positiveIntegerOrNull(phone.id_empleado),
+    numero: trimmedText(phone.numero, 20),
+    tipo: employeePhoneTypes.includes(type) ? type : 'Personal',
+  };
+};
+
+const normalizeAllergy = (allergy = {}) => ({
+  id_alergia: positiveIntegerOrNull(allergy.id_alergia ?? allergy.id),
+  id_empleado: positiveIntegerOrNull(allergy.id_empleado),
+  descripcion: trimmedText(allergy.descripcion, 120),
+});
+
+const normalizeEmployeeDatabaseData = (data = {}) => {
+  const source = data && typeof data === 'object' ? data : {};
+  const areas = normalizeTableById(source.areas, normalizeArea, 'id_area').filter((area) => area.nombre_area);
+  const stores = normalizeTableById(source.tiendas, normalizeStore, 'id_tienda').filter(
+    (store) => store.nombre_tienda,
+  );
+  const areaIds = new Set(areas.map((area) => String(area.id_area)));
+  const positions = normalizeTableById(source.puestos, normalizePosition, 'id_puesto')
+    .filter((position) => position.nombre_puesto)
+    .map((position) => ({
+      ...position,
+      id_area: areaIds.has(String(position.id_area)) ? position.id_area : null,
+    }));
+  const positionIds = new Set(positions.map((position) => String(position.id_puesto)));
+  const storeIds = new Set(stores.map((store) => String(store.id_tienda)));
+  const employees = normalizeTableById(source.empleados, normalizeEmployeeDatabaseEmployee, 'id_empleado')
+    .filter((employee) => employee.nombre)
+    .map((employee) => ({
+      ...employee,
+      id_puesto: positionIds.has(String(employee.id_puesto)) ? employee.id_puesto : null,
+      id_tienda: storeIds.has(String(employee.id_tienda)) ? employee.id_tienda : null,
+    }));
+  const employeeIds = new Set(employees.map((employee) => String(employee.id_empleado)));
+  const phones = normalizeTableById(source.telefonos, normalizePhone, 'id_telefono').filter(
+    (phone) => employeeIds.has(String(phone.id_empleado)) && phone.numero,
+  );
+  const allergies = normalizeTableById(source.alergias, normalizeAllergy, 'id_alergia').filter(
+    (allergy) => employeeIds.has(String(allergy.id_empleado)) && allergy.descripcion,
+  );
+  const normalized = {
+    empleados: employees,
+    puestos: positions,
+    areas,
+    tiendas: stores,
+    telefonos: phones,
+    alergias: allergies,
+  };
+  const syncMetadata = normalizeSyncMetadata(source.__sync);
+
+  if (syncMetadata) {
+    normalized.__sync = syncMetadata;
+  }
+
+  return normalized;
+};
+
 const normalizeDays = (days = []) =>
   [...new Set(days.filter((day) => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)))]
     .sort();
@@ -786,7 +1080,50 @@ const normalizeVacationData = (data = {}) => {
 const normalizeDatasetData = (datasetKey, data) =>
   datasetKey === 'employees'
     ? normalizeEmployeeData(data)
-    : normalizeVacationData(data);
+    : datasetKey === 'employeeDatabase'
+      ? normalizeEmployeeDatabaseData(data)
+      : normalizeVacationData(data);
+
+const recordDayCount = (records = []) =>
+  (Array.isArray(records) ? records : []).reduce((total, record) => total + normalizeDays(record.dias || []).length, 0);
+
+const datasetLogSummary = (datasetKey, data = {}) => {
+  if (datasetKey === 'employees') {
+    return {
+      empleados: Array.isArray(data.empleados) ? data.empleados.length : 0,
+    };
+  }
+
+  if (datasetKey === 'employeeDatabase') {
+    return {
+      expedientes: Array.isArray(data.empleados) ? data.empleados.length : 0,
+      puestos: Array.isArray(data.puestos) ? data.puestos.length : 0,
+      areas: Array.isArray(data.areas) ? data.areas.length : 0,
+      tiendas: Array.isArray(data.tiendas) ? data.tiendas.length : 0,
+      telefonos: Array.isArray(data.telefonos) ? data.telefonos.length : 0,
+      alergias: Array.isArray(data.alergias) ? data.alergias.length : 0,
+    };
+  }
+
+  return {
+    vacaciones: {
+      empleados: Array.isArray(data.vacaciones) ? data.vacaciones.length : 0,
+      dias: recordDayCount(data.vacaciones),
+    },
+    descansos_trabajados: {
+      empleados: Array.isArray(data.descansos_trabajados) ? data.descansos_trabajados.length : 0,
+      dias: recordDayCount(data.descansos_trabajados),
+    },
+    incapacidades: {
+      empleados: Array.isArray(data.incapacidades) ? data.incapacidades.length : 0,
+      dias: recordDayCount(data.incapacidades),
+    },
+    permisos: {
+      empleados: Array.isArray(data.permisos) ? data.permisos.length : 0,
+      dias: recordDayCount(data.permisos),
+    },
+  };
+};
 
 const readDatasetData = async (datasetKey) => {
   const definition = datasetDefinitions[datasetKey];
@@ -823,6 +1160,10 @@ const syncDatasetFromCloud = async (datasetKey, options = {}) => {
 
     if (changed) {
       await writeDatasetData(datasetKey, cloudData);
+      logAppEvent('info', 'Dataset descargado desde la nube', {
+        datasetKey,
+        summary: datasetLogSummary(datasetKey, cloudData),
+      });
       if (notify) {
         emitCloudUpdated(datasetKey);
       }
@@ -840,6 +1181,10 @@ const syncDatasetFromCloud = async (datasetKey, options = {}) => {
     setDatasetSyncState(datasetKey, {
       syncing: false,
       lastError: error.message,
+    });
+    logAppEvent('warn', 'No se pudo sincronizar dataset desde la nube', {
+      datasetKey,
+      error,
     });
     return false;
   }
@@ -868,12 +1213,20 @@ const syncDatasetToCloud = async (datasetKey) => {
       lastUploadAt: syncState.lastSyncAt,
       lastError: null,
     });
+    logAppEvent('info', 'Dataset subido a la nube', {
+      datasetKey,
+      summary: datasetLogSummary(datasetKey, cloudData),
+    });
     return true;
   } catch (error) {
     setDatasetSyncState(datasetKey, {
       syncing: false,
       pendingUpload: true,
       lastError: error.message,
+    });
+    logAppEvent('error', 'No se pudo subir dataset a la nube', {
+      datasetKey,
+      error,
     });
     return false;
   }
@@ -886,6 +1239,11 @@ const saveDatasetAndSync = async (datasetKey, data) => {
 
   await writeDatasetData(datasetKey, localData);
   setDatasetSyncState(datasetKey, { pendingUpload: canUpload, lastError: null });
+  logAppEvent('info', 'Dataset guardado localmente', {
+    datasetKey,
+    pendingUpload: canUpload,
+    summary: datasetLogSummary(datasetKey, localData),
+  });
 
   if (canUpload) {
     await syncDatasetToCloud(datasetKey);
@@ -923,6 +1281,7 @@ const startCloudSync = () => {
     syncAllDatasets({ notify: true }).catch((error) => {
       syncState.lastError = error.message;
       emitSyncStatus();
+      logAppEvent('error', 'Error en sincronizacion programada', { error });
     });
   }, syncPollIntervalMs);
 };
@@ -1005,6 +1364,12 @@ const handleLanRequest = async (request, response) => {
 const createLanHttpServer = () =>
   http.createServer((request, response) => {
     handleLanRequest(request, response).catch((error) => {
+      logAppEvent('error', 'Error atendiendo solicitud LAN', {
+        method: request.method,
+        url: request.url,
+        remoteAddress: normalizeIpAddress(request.socket.remoteAddress || ''),
+        error,
+      });
       jsonResponse(response, 500, { ok: false, error: error.message });
     });
   });
@@ -1044,6 +1409,7 @@ const startLanHttpServer = async () => {
   }
 
   lanHttpPort = lanHttpServer.address()?.port || lanSyncHttpPreferredPort;
+  logAppEvent('info', 'Servidor LAN listo', { port: lanHttpPort });
 };
 
 const stopLanHttpServer = () =>
@@ -1110,7 +1476,9 @@ const startLanDiscovery = async () =>
     });
     socket.bind(lanSyncDiscoveryPort, () => {
       socket.removeAllListeners('error');
-      socket.on('error', () => {});
+      socket.on('error', (error) => {
+        logAppEvent('warn', 'Error en discovery LAN', { error });
+      });
       socket.setBroadcast(true);
       lanDiscoverySocket = socket;
       resolve();
@@ -1144,6 +1512,10 @@ const startLanSync = async () => {
   lanAnnouncementTimer = setInterval(() => {
     broadcastLanAnnouncement().catch(() => {});
   }, lanSyncAnnouncementIntervalMs);
+  logAppEvent('info', 'Sincronizacion LAN iniciada', {
+    discoveryPort: lanSyncDiscoveryPort,
+    httpPort: lanHttpPort,
+  });
 };
 
 const stopLanSync = async () => {
@@ -1183,38 +1555,67 @@ const stopDatasetFileWatchers = () => {
   fileWatchListeners.clear();
 };
 
-ipcMain.handle('vacaciones:get-employees', async () => {
+const registerLoggedIpcHandle = (channel, handler) => {
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      return await handler(event, ...args);
+    } catch (error) {
+      await writeAppLog('error', 'Error en solicitud IPC', {
+        channel,
+        error,
+      });
+      throw error;
+    }
+  });
+};
+
+registerLoggedIpcHandle('vacaciones:log', async (_event, entry = {}) => {
+  await writeAppLog(entry.level, `Interfaz: ${entry.message || 'Evento'}`, entry.details || null);
+  return { ok: true, logPath: logFilePath() };
+});
+
+registerLoggedIpcHandle('vacaciones:get-log-path', async () => logFilePath());
+
+registerLoggedIpcHandle('vacaciones:get-employees', async () => {
   await loadApiConfig();
   await syncDatasetFromCloud('employees', { notify: false });
   return (await readDatasetData('employees')).empleados;
 });
 
-ipcMain.handle('vacaciones:get-vacations', async () => {
+registerLoggedIpcHandle('vacaciones:get-vacations', async () => {
   await loadApiConfig();
   await syncDatasetFromCloud('vacations', { notify: false });
   return readDatasetData('vacations');
 });
 
-ipcMain.handle('vacaciones:get-config', async () => {
+registerLoggedIpcHandle('vacaciones:get-employee-database', async () => {
+  return readDatasetData('employeeDatabase');
+});
+
+registerLoggedIpcHandle('vacaciones:get-config', async () => {
   return readJsonFile('configuracion.json', {});
 });
 
-ipcMain.handle('vacaciones:save-employees', async (_event, employees) => {
+registerLoggedIpcHandle('vacaciones:save-employees', async (_event, employees) => {
   const normalizedEmployees = employees.map(normalizeEmployee);
   const savedData = await saveDatasetAndSync('employees', { empleados: normalizedEmployees });
   return savedData.empleados;
 });
 
-ipcMain.handle('vacaciones:save-vacations', async (_event, records) => {
+registerLoggedIpcHandle('vacaciones:save-vacations', async (_event, records) => {
   return saveDatasetAndSync('vacations', records);
 });
 
-ipcMain.handle('vacaciones:get-sync-status', async () => {
+registerLoggedIpcHandle('vacaciones:save-employee-database', async (_event, database) => {
+  return saveDatasetAndSync('employeeDatabase', database);
+});
+
+registerLoggedIpcHandle('vacaciones:get-sync-status', async () => {
   await loadApiConfig();
   return syncStatusSnapshot();
 });
 
-ipcMain.handle('vacaciones:sync-now', async () => {
+registerLoggedIpcHandle('vacaciones:sync-now', async () => {
   return syncAllDatasets({ notify: true });
 });
 
@@ -1236,26 +1637,77 @@ const createWindow = () => {
   });
 
   mainWindow.removeMenu();
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    logAppEvent('error', 'Proceso de interfaz terminado', { details });
+  });
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    logAppEvent('error', 'No se pudo cargar la interfaz', {
+      errorCode,
+      errorDescription,
+      validatedURL,
+    });
+  });
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level < 2) {
+      return;
+    }
+
+    logAppEvent(level >= 3 ? 'error' : 'warn', 'Mensaje de consola de interfaz', {
+      message,
+      line,
+      sourceId,
+    });
+  });
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 };
 
 app.whenReady().then(async () => {
-  await ensureWritableDataFiles().catch(() => {});
-  await loadApiConfig().catch(() => {});
+  await writeAppLog('info', 'Aplicacion iniciada', {
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    dataDirectory: dataDirectoryPath(),
+    logFile: logFilePath(),
+  });
+  await ensureWritableDataFiles()
+    .then(() => {
+      logAppEvent('info', 'Archivos de datos listos');
+    })
+    .catch((error) => {
+      logAppEvent('error', 'No se pudieron preparar los archivos de datos', { error });
+    });
+  await loadApiConfig().catch((error) => {
+    logAppEvent('warn', 'No se pudo cargar configapi.txt', { error });
+  });
   createWindow();
-  await startLanSync().catch(() => {});
+  await startLanSync().catch((error) => {
+    logAppEvent('warn', 'No se pudo iniciar la sincronizacion LAN', { error });
+  });
   startDatasetFileWatchers();
+  logAppEvent('info', 'Vigilancia de archivos iniciada', {
+    files: Object.values(datasetDefinitions).map((definition) => definition.fileName),
+  });
   startCloudSync();
-  syncAllDatasets({ notify: true }).catch(() => {});
+  logAppEvent('info', 'Sincronizacion periodica iniciada', { intervalMs: syncPollIntervalMs });
+  syncAllDatasets({ notify: true })
+    .then(() => {
+      logAppEvent('info', 'Sincronizacion inicial terminada');
+    })
+    .catch((error) => {
+      logAppEvent('error', 'Error en sincronizacion inicial', { error });
+    });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
+}).catch((error) => {
+  logAppEvent('error', 'Error fatal al iniciar la aplicacion', { error });
+  app.quit();
 });
 
 app.on('before-quit', () => {
+  logAppEvent('info', 'Aplicacion cerrandose');
   if (syncTimer) {
     clearInterval(syncTimer);
   }
