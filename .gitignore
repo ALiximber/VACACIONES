@@ -16,7 +16,6 @@ pnpm-debug.log*
 # Runtime data, local configuration, and secrets
 .env
 .env.*
-configapi.txt
 configuracion.json
 empleados.json
 vacaciones.json

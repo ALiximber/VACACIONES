@@ -1,3 +1,7 @@
+// Proceso principal de Electron (Node.js).
+// Es el "backend" de la app: gestiona archivos JSON, sincronización con la nube
+// y sincronización LAN entre equipos en la misma red local.
+// Se comunica con la interfaz (index.js) a través de IPC (ipcMain/ipcRenderer).
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { createHash, randomUUID } = require('node:crypto');
 const dgram = require('node:dgram');
@@ -39,6 +43,9 @@ const lanSyncAnnouncementIntervalMs = 5000;
 const lanSyncPeerTimeoutMs = 20000;
 const lanSyncRequestTimeoutMs = 3000;
 const lanSyncMaxPayloadBytes = 1024 * 1024;
+// ─── ESTADO DE SINCRONIZACIÓN ────────────────────────────────────────────────
+// Refleja el estado actual de cada dataset (empleados, vacaciones, expedientes)
+// respecto a la nube. La UI lo consulta para mostrar el indicador de sincronización.
 const syncState = {
   enabled: false,
   lastSyncAt: null,
@@ -88,6 +95,10 @@ const datasetDefinitions = {
   },
 };
 
+// ─── RUTAS DE ARCHIVOS ───────────────────────────────────────────────────────
+// En producción (app empaquetada), los datos del usuario se guardan en la carpeta
+// userData de Electron para no mezclar con los archivos de la app instalada.
+// En desarrollo (__dirname) los archivos están junto al código fuente.
 const bundledDataFilePath = (fileName) => path.join(__dirname, fileName);
 const dataDirectoryPath = () => (app.isPackaged ? app.getPath('userData') : __dirname);
 const dataFilePath = (fileName) => path.join(dataDirectoryPath(), fileName);
@@ -169,6 +180,9 @@ const safeLogValue = (value, depth = 0) => {
   return String(value);
 };
 
+// ─── SISTEMA DE LOGGING ──────────────────────────────────────────────────────
+// Escribe una línea por evento en un archivo .log con rotación automática
+// al superar 2 MB. Las claves sensibles (apikey, token, etc.) se redactan.
 const rotateLogFileIfNeeded = async () => {
   try {
     const stats = await fs.stat(logFilePath());
@@ -214,6 +228,9 @@ process.on('unhandledRejection', (reason) => {
   logAppEvent('error', 'Promesa rechazada no controlada en proceso principal', { reason });
 });
 
+// ─── GESTIÓN DE ARCHIVOS DE DATOS ───────────────────────────────────────────
+// En una app empaquetada los archivos de la instalación son de solo lectura,
+// por eso se copian a userData la primera vez y desde ahí se leen/escriben.
 const ensureWritableDataFile = async (fileName) => {
   if (!app.isPackaged) {
     return;
@@ -258,6 +275,9 @@ const ensureWritableDataFiles = async () => {
   writableDataFilesReady = true;
 };
 
+// ─── LECTURA / ESCRITURA DE ARCHIVOS JSON ───────────────────────────────────
+// Abstraen el acceso a disco; siempre aseguran que los archivos existan antes
+// de leerlos y escriben con sangría de 2 espacios para que sean legibles.
 const readJsonFile = async (fileName, fallback) => {
   await ensureWritableDataFiles();
 
@@ -281,6 +301,11 @@ const writeJsonFile = async (fileName, data) => {
 
 const stableJson = (value) => JSON.stringify(value);
 
+// ─── HELPERS DE SINCRONIZACIÓN CON LA NUBE ──────────────────────────────────
+// Algunos servicios de hosting devuelven el JSON envuelto en texto extra o
+// doblemente codificado; parseLastJsonDocument extrae el último JSON válido del string.
+// incomingDatasetWins compara timestamps __sync.updatedAt para resolver conflictos:
+// gana el dato más reciente sin importar de dónde venga.
 const parseLastJsonDocument = (text) => {
   let startIndex = -1;
   let depth = 0;
@@ -403,6 +428,11 @@ const incomingDatasetWins = (incomingData, currentData) => {
   return incomingStamp >= currentStamp;
 };
 
+// ─── UTILIDADES DE RED LOCAL (LAN) ───────────────────────────────────────────
+// La sincronización LAN usa UDP para descubrimiento (broadcast) y HTTP para
+// transferir datasets entre equipos en la misma red.
+// Solo se aceptan conexiones desde direcciones privadas (10.x, 192.168.x, etc.)
+// para evitar acceso desde internet.
 const normalizeIpAddress = (value = '') => value.replace(/^::ffff:/, '');
 
 const isPrivateLanAddress = (value = '') => {
@@ -448,6 +478,8 @@ const lanBroadcastAddresses = () => {
   return [...addresses];
 };
 
+// El token LAN es un hash SHA-256 de las claves de edición configuradas.
+// Así solo los equipos que comparten la misma configuración pueden intercambiar datos.
 const localLanSyncToken = () =>
   createHash('sha256')
     .update(
@@ -699,6 +731,9 @@ const broadcastDatasetToLanPeers = async (datasetKey, data) => {
   );
 };
 
+// ─── CONFIGURACIÓN DE API EN LA NUBE ─────────────────────────────────────────
+// Lee configapi.txt, un archivo de texto con bloques { Name: ..., API Endpoint: ..., Edit Key: ... }
+// Soporta múltiples bloques para distintos datasets (EMPLEADOS, VACACIONES, EMPLEADOS_BD).
 const parseApiConfig = (content) => {
   const blocks = content.match(/\{[\s\S]*?\}/g) || [];
 
@@ -786,6 +821,9 @@ const fetchWithTimeout = async (url, options = {}) => {
   }
 };
 
+// ─── DESCARGA Y SUBIDA A LA NUBE ─────────────────────────────────────────────
+// downloadCloudJson descarga desde el rawEndpoint (URL pública de solo lectura).
+// uploadCloudJson sube via PATCH al apiEndpoint con la clave de edición en el header.
 const downloadCloudJson = async (datasetKey) => {
   const config = apiConfigForDataset(datasetKey);
 
@@ -832,6 +870,9 @@ const uploadCloudJson = async (datasetKey, data) => {
   return response.json().catch(() => null);
 };
 
+// ─── NORMALIZACIÓN DE DATOS ──────────────────────────────────────────────────
+// Espejo de las funciones de index.js: validan y limpian los datos antes de
+// escribirlos en disco, garantizando consistencia independientemente del origen.
 const normalizeSchedule = (schedule = {}) =>
   scheduleDays.reduce((result, day) => {
     const hours = schedule?.[day];
@@ -1125,6 +1166,9 @@ const datasetLogSummary = (datasetKey, data = {}) => {
   };
 };
 
+// ─── ACCESO A DATASETS ───────────────────────────────────────────────────────
+// readDatasetData y writeDatasetData son los únicos puntos de acceso al disco
+// para los tres datasets principales; siempre normalizan antes de retornar o escribir.
 const readDatasetData = async (datasetKey) => {
   const definition = datasetDefinitions[datasetKey];
   return normalizeDatasetData(datasetKey, await readJsonFile(definition.fileName, definition.fallback));
@@ -1137,6 +1181,11 @@ const writeDatasetData = async (datasetKey, data) => {
   return normalizedData;
 };
 
+// ─── LÓGICA DE SINCRONIZACIÓN CON LA NUBE ───────────────────────────────────
+// syncDatasetFromCloud descarga si no hay cambios pendientes de subir.
+// syncDatasetToCloud sube los cambios locales y limpia el flag pendingUpload.
+// saveDatasetAndSync guarda localmente y luego intenta subir a la nube;
+//   si la subida falla, marca pendingUpload=true para reintentar en el siguiente ciclo.
 const syncDatasetFromCloud = async (datasetKey, options = {}) => {
   const { notify = true } = options;
   const config = apiConfigForDataset(datasetKey);
@@ -1286,6 +1335,12 @@ const startCloudSync = () => {
   }, syncPollIntervalMs);
 };
 
+// ─── SINCRONIZACIÓN LAN (RED LOCAL) ─────────────────────────────────────────
+// Mecanismo en dos capas:
+//   1. UDP broadcast: cada instancia anuncia su presencia y versiones de datasets cada 5 s.
+//   2. HTTP: cuando un par detecta datos más nuevos, los descarga con pullDatasetFromPeer()
+//      o los recibe vía POST cuando el otro equipo guarda cambios.
+// El token LAN impide que apps ajenas accedan al servidor HTTP interno.
 const lanAnnouncementPayload = async () => ({
   appId: lanSyncAppId,
   instanceId: syncSourceId,
@@ -1523,6 +1578,9 @@ const stopLanSync = async () => {
   await stopLanHttpServer();
 };
 
+// ─── VIGILANCIA DE ARCHIVOS ──────────────────────────────────────────────────
+// Detecta cambios externos en los archivos JSON (por ejemplo, edición manual
+// o sincronización de nube como Dropbox) y notifica a la UI para que recargue.
 const startDatasetFileWatchers = () => {
   if (fileWatchListeners.size > 0) {
     return;
@@ -1555,6 +1613,9 @@ const stopDatasetFileWatchers = () => {
   fileWatchListeners.clear();
 };
 
+// ─── MANEJADORES IPC ─────────────────────────────────────────────────────────
+// Cada manejador responde a una llamada desde la interfaz (preload.js expone estos canales).
+// registerLoggedIpcHandle envuelve todos con captura de errores y logging automático.
 const registerLoggedIpcHandle = (channel, handler) => {
   ipcMain.handle(channel, async (event, ...args) => {
     try {
@@ -1619,6 +1680,9 @@ registerLoggedIpcHandle('vacaciones:sync-now', async () => {
   return syncAllDatasets({ notify: true });
 });
 
+// ─── VENTANA PRINCIPAL ───────────────────────────────────────────────────────
+// Crea la ventana de Electron con contexto aislado (contextIsolation: true)
+// para que el preload sea el único puente entre el renderer y Node.js.
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -1661,6 +1725,10 @@ const createWindow = () => {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 };
 
+// ─── CICLO DE VIDA DE LA APLICACIÓN ─────────────────────────────────────────
+// Secuencia de arranque: archivos → configapi → ventana → LAN sync → file watchers → cloud sync.
+// El orden importa: la ventana se abre antes de que la sync termine para que la UI
+// no bloquee al usuario mientras se descargan datos de la nube.
 app.whenReady().then(async () => {
   await writeAppLog('info', 'Aplicacion iniciada', {
     version: app.getVersion(),

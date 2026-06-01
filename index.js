@@ -1,4 +1,10 @@
+// Aplicación de control de vacaciones y expedientes de empleados.
+// Todo el código corre en el navegador (o en Electron vía webContents).
+// Se comunica con el proceso principal de Electron a través de window.vacacionesData (preload.js),
+// y cae en modo solo-navegador si ese objeto no existe.
 (function () {
+  // ─── CONSTANTES DE CONFIGURACIÓN ───────────────────────────────────────────
+  // Nombres de meses y días usados en la interfaz.
   const monthNames = [
     'Enero',
     'Febrero',
@@ -23,6 +29,8 @@
     { key: 'Sabado', short: 'S' },
     { key: 'Domingo', short: 'D' },
   ];
+  // ─── CLAVES DE ALMACENAMIENTO LOCAL ────────────────────────────────────────
+  // Cada clave identifica un conjunto de datos guardado en localStorage.
   const calendarStorageKey = 'calendario-vacaciones-eventos';
   const matrixStorageKey = 'calendario-vacaciones-cuadricula';
   const employeesStorageKey = 'calendario-vacaciones-empleados';
@@ -31,6 +39,9 @@
   const themeStorageKey = 'calendario-vacaciones-tema';
   const themes = ['light', 'dark'];
 
+  // ─── TIPOS DE AUSENCIA ─────────────────────────────────────────────────────
+  // 'reasons' define los motivos que puede tener un día marcado en la cuadrícula.
+  // El orden importa: cycleEmployeeDayReason() avanza en este array al hacer clic.
   const reasons = [
     { id: 'V', label: 'Vacaciones', className: 'reason-v' },
     { id: 'D', label: 'Descanso trabajado', className: 'reason-d' },
@@ -109,7 +120,11 @@
     ],
   };
 
+  // ─── ESTADO GLOBAL DE LA APLICACIÓN ────────────────────────────────────────
+  // 'today' se fija al abrir la app para que todos los cálculos de edad/antigüedad
+  // sean consistentes durante toda la sesión.
   const today = new Date();
+  // 'state' es el único objeto mutable compartido; todas las funciones lo leen y modifican.
   const state = {
     year: today.getFullYear(),
     month: today.getMonth(),
@@ -135,12 +150,13 @@
     employeeDatabaseFilters: { area: '', position: '', store: '' },
   };
 
+  // ─── REFERENCIAS AL DOM ─────────────────────────────────────────────────────
+  // Se capturan una sola vez para evitar búsquedas repetidas en cada render.
   const calendarPage = document.querySelector('#calendar-page');
   const matrixPage = document.querySelector('#matrix-page');
   const schedulesPage = document.querySelector('#schedules-page');
   const employeesPage = document.querySelector('#employees-page');
   const employeeDatabasePage = document.querySelector('#employee-database-page');
-  const configPage = document.querySelector('#config-page');
   const calendar = document.querySelector('#calendar');
   const employeeGrid = document.querySelector('#employee-grid');
   const scheduleGrid = document.querySelector('#schedule-grid');
@@ -203,19 +219,6 @@
   const employeeDatabasePhoneEmergency2Input = document.querySelector('#employee-database-phone-emergency-2');
   const employeeDatabasePhoneHomeInput = document.querySelector('#employee-database-phone-home');
   const employeeDatabaseAllergiesInput = document.querySelector('#employee-database-allergies');
-  const catalogEmptyHint = document.querySelector('#catalog-empty-hint');
-  const goToConfigBtn = document.querySelector('#go-to-config-btn');
-  const configAreaForm = document.querySelector('#config-area-form');
-  const configAreaNameInput = document.querySelector('#config-area-name');
-  const configAreaList = document.querySelector('#config-area-list');
-  const configPositionForm = document.querySelector('#config-position-form');
-  const configPositionNameInput = document.querySelector('#config-position-name');
-  const configPositionAreaSelect = document.querySelector('#config-position-area');
-  const configPositionList = document.querySelector('#config-position-list');
-  const configStoreForm = document.querySelector('#config-store-form');
-  const configStoreNameInput = document.querySelector('#config-store-name');
-  const configStoreAddressInput = document.querySelector('#config-store-address');
-  const configStoreList = document.querySelector('#config-store-list');
   const matrixTitle = document.querySelector('#matrix-title');
   const dayModal = document.querySelector('#day-modal');
   const dayModalTitle = document.querySelector('#day-modal-title');
@@ -237,6 +240,8 @@
     typeof BroadcastChannel === 'function' ? new BroadcastChannel('calendario-vacaciones-live-sync') : null;
   const externalRefreshTimes = {};
 
+  // ─── MANEJO DE ERRORES Y LOGGING ────────────────────────────────────────────
+  // Convierte cualquier tipo de error a un objeto serializable para los logs.
   const errorDetails = (error) => {
     if (!error) {
       return null;
@@ -297,6 +302,8 @@
     });
   });
 
+  // ─── UTILIDADES GENERALES ───────────────────────────────────────────────────
+  // Rellena con cero a la izquierda para formar fechas con formato YYYY-MM-DD.
   const pad = (value) => String(value).padStart(2, '0');
   const dateKey = (year, month, day) => `${year}-${pad(month + 1)}-${pad(day)}`;
 
@@ -308,6 +315,8 @@
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#039;');
 
+  // ─── HELPERS DE LOCALSTORAGE ────────────────────────────────────────────────
+  // Lee y parsea JSON desde localStorage; devuelve 'fallback' si falla o está vacío.
   const readStorage = (key, fallback) => {
     try {
       return JSON.parse(localStorage.getItem(key)) || fallback;
@@ -327,6 +336,8 @@
     }
   };
 
+  // ─── GESTIÓN DE TEMA VISUAL ─────────────────────────────────────────────────
+  // Aplica 'light' u 'dark' al atributo data-theme del <html> para activar las variables CSS.
   const applyTheme = (theme) => {
     const nextTheme = themes.includes(theme) ? theme : 'light';
     state.theme = nextTheme;
@@ -350,6 +361,9 @@
     announceLiveSync('theme');
   };
 
+  // ─── SINCRONIZACIÓN ENTRE PESTAÑAS / VENTANAS ───────────────────────────────
+  // BroadcastChannel notifica a otras pestañas abiertas en el mismo origen.
+  // El evento 'storage' cubre pestañas en navegadores sin BroadcastChannel support.
   const announceLiveSync = (scope) => {
     if (!scope) {
       return;
@@ -500,6 +514,8 @@
     renderAll();
   };
 
+  // ─── NORMALIZACIÓN DE DATOS ─────────────────────────────────────────────────
+  // Elimina duplicados, valida formato YYYY-MM-DD y ordena cronológicamente.
   const normalizeDays = (days = []) =>
     [...new Set(days.filter((day) => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)))]
       .sort();
@@ -768,6 +784,9 @@
       return result;
     }, {});
 
+  // ─── GESTIÓN DE EMPLEADOS EN ESTADO ────────────────────────────────────────
+  // Al cargar empleados, extrae vacaciones embebidas en el formato legado
+  // (campo 'vacaciones' dentro de cada empleado) y las migra al mapa centralizado.
   const setEmployees = (employees) => {
     const legacyVacationRecords = [];
 
@@ -1156,6 +1175,9 @@
     alergias: database.alergias.length,
   });
 
+  // ─── FUNCIONES DE GUARDADO ──────────────────────────────────────────────────
+  // Cada función guarda su dataset en localStorage y, si la app corre en Electron,
+  // también lo persiste en el archivo JSON correspondiente vía window.vacacionesData.
   const saveCalendarEvents = () => {
     localStorage.setItem(calendarStorageKey, JSON.stringify(state.events));
     announceLiveSync('calendar');
@@ -1419,8 +1441,11 @@
     return Math.max(0, years);
   };
 
-  // Returns the labor year (año laboral) that contains referenceDate, anchored to the employee's start date.
-  // The labor year runs from one anniversary to the next, not from Jan 1.
+  // ─── CÁLCULO DE AÑO LABORAL Y DÍAS DE VACACIONES ───────────────────────────
+  // El "año laboral" no es el año calendario: va de aniversario a aniversario.
+  // Por ejemplo, para un empleado que entró el 15-Mar-2022, su año laboral 2025
+  // corre del 15-Mar-2025 al 14-Mar-2026. Solo los días tomados dentro de ese rango
+  // se descuentan de su cuota anual.
   const getLaborYearRange = (startDate, referenceDate = today) => {
     const start = new Date(`${startDate}T00:00:00`);
 
@@ -1610,6 +1635,11 @@
     state.needsVacationDataSave = !hasJsonSupplementalEvents && hasStoredSupplementalEvents;
   };
 
+  // ─── CARGA DE DATOS ─────────────────────────────────────────────────────────
+  // Cada función intenta tres fuentes en orden de prioridad:
+  //   1. window.vacacionesData (Electron IPC)
+  //   2. fetch() al archivo JSON local (modo navegador con servidor)
+  //   3. localStorage como último recurso si las anteriores fallan
   const loadEmployees = async () => {
     if (window.vacacionesData?.getEmployees) {
       try {
@@ -1778,6 +1808,10 @@
     }
   };
 
+  // ─── FUNCIONES DE RENDERIZADO ───────────────────────────────────────────────
+  // Cada función regenera completamente el HTML de su sección.
+  // Se usan innerHTML con strings escapados; no hay framework reactivo,
+  // por eso se re-renderiza toda la sección aunque solo cambie un dato.
   const renderView = () => {
     const showsMonths = state.view === 'calendar' || state.view === 'matrix';
 
@@ -1792,8 +1826,6 @@
     employeesPage.classList.toggle('active-page', state.view === 'employees');
     employeeDatabasePage.classList.toggle('hidden', state.view !== 'employee-database');
     employeeDatabasePage.classList.toggle('active-page', state.view === 'employee-database');
-    configPage.classList.toggle('hidden', state.view !== 'config');
-    configPage.classList.toggle('active-page', state.view === 'config');
 
     viewButtons.forEach((button) => {
       button.classList.toggle('active', button.dataset.view === state.view);
@@ -2185,7 +2217,6 @@
     renderSchedules();
     renderEmployees();
     renderEmployeeDatabase();
-    renderConfigPage();
   };
 
   const openDayModal = (date) => {
@@ -2252,115 +2283,10 @@
     state.editingEmployeeId = null;
   };
 
-  const updateExpedientePositionSelect = () => {
-    const areaId = employeeDatabaseAreaInput.value;
-    const prev = employeeDatabasePositionInput.value;
-    const filtered = areaId
-      ? state.employeeDatabase.puestos.filter((p) => String(p.id_area) === areaId)
-      : state.employeeDatabase.puestos;
-    employeeDatabasePositionInput.innerHTML =
-      '<option value="">— Sin puesto —</option>' +
-      filtered.map((p) => `<option value="${p.id_puesto}">${escapeHtml(p.nombre_puesto)}</option>`).join('');
-    employeeDatabasePositionInput.value = prev;
-  };
-
   const renderEmployeeDatabaseOptions = () => {
     employeeDatabaseEmployeeInput.innerHTML = state.employees
       .map((employee) => `<option value="${escapeHtml(employee.id)}">${escapeHtml(employeeName(employee))}</option>`)
       .join('');
-
-    const hasAreas = state.employeeDatabase.areas.length > 0;
-    const hasPuestos = state.employeeDatabase.puestos.length > 0;
-    const hasTiendas = state.employeeDatabase.tiendas.length > 0;
-    const catalogsEmpty = !hasAreas && !hasPuestos && !hasTiendas;
-    if (catalogEmptyHint) catalogEmptyHint.classList.toggle('hidden', !catalogsEmpty);
-
-    const prevArea = employeeDatabaseAreaInput.value;
-    employeeDatabaseAreaInput.innerHTML =
-      '<option value="">— Sin área —</option>' +
-      state.employeeDatabase.areas
-        .map((a) => `<option value="${a.id_area}">${escapeHtml(a.nombre_area)}</option>`)
-        .join('');
-    employeeDatabaseAreaInput.value = prevArea;
-
-    updateExpedientePositionSelect();
-
-    const prevStore = employeeDatabaseStoreInput.value;
-    employeeDatabaseStoreInput.innerHTML =
-      '<option value="">— Sin tienda —</option>' +
-      state.employeeDatabase.tiendas
-        .map((s) => `<option value="${s.id_tienda}">${escapeHtml(s.nombre_tienda)}</option>`)
-        .join('');
-    employeeDatabaseStoreInput.value = prevStore;
-  };
-
-  const renderConfigPage = () => {
-    if (!configAreaList || !configPositionList || !configStoreList || !configPositionAreaSelect) return;
-    const areas = state.employeeDatabase.areas;
-    const puestos = state.employeeDatabase.puestos;
-    const tiendas = state.employeeDatabase.tiendas;
-
-    configAreaList.innerHTML = areas.length === 0
-      ? '<li class="config-empty">No hay áreas registradas.</li>'
-      : areas.map((area) => {
-          const used = puestos.filter((p) => String(p.id_area) === String(area.id_area)).length;
-          return `<li class="config-item">
-            <div class="config-item-info">
-              <span class="config-item-name">${escapeHtml(area.nombre_area)}</span>
-              ${used ? `<span class="config-item-count">${used} puesto${used !== 1 ? 's' : ''}</span>` : ''}
-            </div>
-            <button class="config-delete-btn" type="button" data-delete-area="${area.id_area}" title="Eliminar">&#10005;</button>
-          </li>`;
-        }).join('');
-
-    const prevSel = configPositionAreaSelect.value;
-    configPositionAreaSelect.innerHTML =
-      '<option value="">Sin área</option>' +
-      areas.map((a) => `<option value="${a.id_area}">${escapeHtml(a.nombre_area)}</option>`).join('');
-    configPositionAreaSelect.value = prevSel;
-
-    configPositionList.innerHTML = puestos.length === 0
-      ? '<li class="config-empty">No hay puestos registrados.</li>'
-      : puestos.map((p) => {
-          const area = p.id_area ? areas.find((a) => String(a.id_area) === String(p.id_area)) : null;
-          const used = state.employeeDatabase.empleados.filter((e) => String(e.id_puesto) === String(p.id_puesto)).length;
-          return `<li class="config-item">
-            <div class="config-item-info">
-              <span class="config-item-name">${escapeHtml(p.nombre_puesto)}</span>
-              ${area ? `<span class="config-item-sub">${escapeHtml(area.nombre_area)}</span>` : ''}
-            </div>
-            ${used ? `<span class="config-item-count">${used} emp.</span>` : ''}
-            <button class="config-delete-btn" type="button" data-delete-position="${p.id_puesto}" title="Eliminar">&#10005;</button>
-          </li>`;
-        }).join('');
-
-    configStoreList.innerHTML = tiendas.length === 0
-      ? '<li class="config-empty">No hay tiendas registradas.</li>'
-      : tiendas.map((s) => {
-          const used = state.employeeDatabase.empleados.filter((e) => String(e.id_tienda) === String(s.id_tienda)).length;
-          return `<li class="config-item">
-            <div class="config-item-info">
-              <span class="config-item-name">${escapeHtml(s.nombre_tienda)}</span>
-              ${s.direccion_tienda ? `<span class="config-item-sub">${escapeHtml(s.direccion_tienda)}</span>` : ''}
-            </div>
-            ${used ? `<span class="config-item-count">${used} emp.</span>` : ''}
-            <button class="config-delete-btn" type="button" data-delete-store="${s.id_tienda}" title="Eliminar">&#10005;</button>
-          </li>`;
-        }).join('');
-  };
-
-  const focusConfigAddInput = (input) => {
-    if (!input) return;
-
-    const focusInput = () => {
-      if (state.view === 'config' && document.contains(input)) {
-        input.focus({ preventScroll: true });
-      }
-    };
-
-    focusInput();
-    window.requestAnimationFrame(focusInput);
-    window.setTimeout(focusInput, 200);
   };
 
   const fillEmployeeDatabaseForm = (employeeId) => {
@@ -2396,10 +2322,9 @@
     employeeDatabaseEmailInput.value = detail?.correo || '';
     employeeDatabaseSchoolingInput.value = detail?.escolaridad || '';
     employeeDatabaseChildrenInput.value = detail?.num_hijos ?? 0;
-    employeeDatabaseAreaInput.value = area?.id_area ? String(area.id_area) : '';
-    updateExpedientePositionSelect();
-    employeeDatabasePositionInput.value = position?.id_puesto ? String(position.id_puesto) : '';
-    employeeDatabaseStoreInput.value = store?.id_tienda ? String(store.id_tienda) : '';
+    employeeDatabaseAreaInput.value = area?.nombre_area || '';
+    employeeDatabasePositionInput.value = position?.nombre_puesto || '';
+    employeeDatabaseStoreInput.value = store?.nombre_tienda || '';
     employeeDatabaseStoreAddressInput.value = store?.direccion_tienda || '';
     employeeDatabaseAccountInput.value = detail?.num_cuenta || '';
     employeeDatabaseCardInput.value = detail?.num_tarjeta || '';
@@ -2479,8 +2404,12 @@
       return;
     }
 
-    const positionId = positiveIntegerOrNull(employeeDatabasePositionInput.value);
-    const storeId = positiveIntegerOrNull(employeeDatabaseStoreInput.value);
+    const areaText = trimmedText(employeeDatabaseAreaInput.value, 80);
+    const positionText = trimmedText(employeeDatabasePositionInput.value, 80);
+    const storeName = employeeDatabaseStoreInput.value;
+    const areaId = areaText ? upsertDatabaseArea(areaText) : null;
+    const positionId = positionText ? upsertDatabasePosition(positionText, areaId) : null;
+    const storeId = storeName ? upsertDatabaseStore(storeName, '') : null;
     const detail = {
       ...detailBase,
       id_puesto: positionId,
@@ -2721,6 +2650,9 @@
     renderEmployees();
   };
 
+  // ─── SINCRONIZACIÓN CON LA NUBE ─────────────────────────────────────────────
+  // Escucha eventos del proceso principal de Electron (via preload) para actualizar
+  // la UI cuando otro equipo o la nube modifica los datos.
   const bindCloudSyncEvents = () => {
     if (!window.vacacionesData?.getSyncStatus) {
       updateSyncStatus({ enabled: false });
@@ -2799,6 +2731,9 @@
     });
   };
 
+  // ─── REGISTRO DE EVENTOS DE INTERFAZ ───────────────────────────────────────
+  // Conecta todos los elementos del DOM con sus manejadores.
+  // Se llama una sola vez desde init() para evitar listeners duplicados.
   const bindEvents = () => {
     monthButtons.forEach((button) => {
       button.addEventListener('click', () => {
@@ -2811,7 +2746,6 @@
       button.addEventListener('click', () => {
         state.view = button.dataset.view;
         renderView();
-        if (state.view === 'config') renderConfigPage();
       });
     });
 
@@ -2863,33 +2797,11 @@
     closeEmployeeModalButton.addEventListener('click', closeEmployeeModal);
     closeScheduleModalButton.addEventListener('click', closeScheduleModal);
     closeEmployeeDatabaseModalButton.addEventListener('click', closeEmployeeDatabaseModal);
-    goToConfigBtn?.addEventListener('click', () => {
-      closeEmployeeDatabaseModal();
-      state.view = 'config';
-      renderView();
-      renderConfigPage();
-    });
     addEmployeeButton.addEventListener('click', () => openEmployeeModal());
     addEmployeeDatabaseButton.addEventListener('click', () => openEmployeeDatabaseModal());
     scheduleTypeInput.addEventListener('change', setScheduleTimeInputsEnabled);
     employeeDatabaseEmployeeInput.addEventListener('change', () => {
       fillEmployeeDatabaseForm(employeeDatabaseEmployeeInput.value);
-    });
-
-    employeeDatabaseAreaInput.addEventListener('change', () => {
-      updateExpedientePositionSelect();
-    });
-
-    employeeDatabaseStoreInput.addEventListener('change', () => {
-      const storeId = employeeDatabaseStoreInput.value;
-      const store = storeId
-        ? databaseRowById(state.employeeDatabase.tiendas, 'id_tienda', storeId)
-        : null;
-      if (store?.direccion_tienda) {
-        employeeDatabaseStoreAddressInput.value = store.direccion_tienda;
-      } else if (!storeId) {
-        employeeDatabaseStoreAddressInput.value = '';
-      }
     });
 
     birthdayMonthFilterInput?.addEventListener('change', () => {
@@ -2930,125 +2842,6 @@
       button.addEventListener('click', () => {
         setEmployeeDatabaseSort(button.dataset.sortKey);
       });
-    });
-
-    configAreaForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const name = trimmedText(configAreaNameInput.value, 80);
-      if (!name) { configAreaNameInput.focus(); return; }
-      if (databaseRowByName(state.employeeDatabase.areas, 'nombre_area', name)) {
-        window.alert('Ya existe un área con ese nombre.');
-        configAreaNameInput.focus();
-        return;
-      }
-      state.employeeDatabase.areas.push({
-        id_area: nextDatabaseId(state.employeeDatabase.areas, 'id_area'),
-        nombre_area: name,
-      });
-      configAreaForm.reset();
-      await saveEmployeeDatabase();
-      renderConfigPage();
-      focusConfigAddInput(configAreaNameInput);
-    });
-
-    configPositionForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const name = trimmedText(configPositionNameInput.value, 80);
-      if (!name) { configPositionNameInput.focus(); return; }
-      if (databaseRowByName(state.employeeDatabase.puestos, 'nombre_puesto', name)) {
-        window.alert('Ya existe un puesto con ese nombre.');
-        configPositionNameInput.focus();
-        return;
-      }
-      const areaId = positiveIntegerOrNull(configPositionAreaSelect.value);
-      state.employeeDatabase.puestos.push({
-        id_puesto: nextDatabaseId(state.employeeDatabase.puestos, 'id_puesto'),
-        nombre_puesto: name,
-        id_area: areaId,
-      });
-      configPositionForm.reset();
-      await saveEmployeeDatabase();
-      renderConfigPage();
-      focusConfigAddInput(configPositionNameInput);
-    });
-
-    configStoreForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const name = trimmedText(configStoreNameInput.value, 80);
-      if (!name) { configStoreNameInput.focus(); return; }
-      if (databaseRowByName(state.employeeDatabase.tiendas, 'nombre_tienda', name)) {
-        window.alert('Ya existe una tienda con ese nombre.');
-        configStoreNameInput.focus();
-        return;
-      }
-      state.employeeDatabase.tiendas.push({
-        id_tienda: nextDatabaseId(state.employeeDatabase.tiendas, 'id_tienda'),
-        nombre_tienda: name,
-        direccion_tienda: trimmedText(configStoreAddressInput.value, 255),
-      });
-      configStoreForm.reset();
-      await saveEmployeeDatabase();
-      renderConfigPage();
-      focusConfigAddInput(configStoreNameInput);
-    });
-
-    configAreaList?.addEventListener('click', async (event) => {
-      const btn = event.target.closest('[data-delete-area]');
-      if (!btn) return;
-      const id = btn.dataset.deleteArea;
-      const area = databaseRowById(state.employeeDatabase.areas, 'id_area', id);
-      const linked = state.employeeDatabase.puestos.filter((p) => String(p.id_area) === id).length;
-      const msg = linked
-        ? `¿Eliminar el área "${area?.nombre_area}"? Tiene ${linked} puesto(s) vinculado(s) que quedarán sin área.`
-        : `¿Eliminar el área "${area?.nombre_area}"?`;
-      if (!window.confirm(msg)) return;
-      state.employeeDatabase.areas = state.employeeDatabase.areas.filter((a) => String(a.id_area) !== id);
-      state.employeeDatabase.puestos = state.employeeDatabase.puestos.map((p) =>
-        String(p.id_area) === id ? { ...p, id_area: null } : p,
-      );
-      await saveEmployeeDatabase();
-      renderConfigPage();
-      focusConfigAddInput(configAreaNameInput);
-    });
-
-    configPositionList?.addEventListener('click', async (event) => {
-      const btn = event.target.closest('[data-delete-position]');
-      if (!btn) return;
-      const id = btn.dataset.deletePosition;
-      const pos = databaseRowById(state.employeeDatabase.puestos, 'id_puesto', id);
-      const used = state.employeeDatabase.empleados.filter((e) => String(e.id_puesto) === id).length;
-      const msg = used
-        ? `¿Eliminar el puesto "${pos?.nombre_puesto}"? ${used} expediente(s) lo usan y quedarán sin puesto.`
-        : `¿Eliminar el puesto "${pos?.nombre_puesto}"?`;
-      if (!window.confirm(msg)) return;
-      state.employeeDatabase.puestos = state.employeeDatabase.puestos.filter((p) => String(p.id_puesto) !== id);
-      state.employeeDatabase.empleados = state.employeeDatabase.empleados.map((e) =>
-        String(e.id_puesto) === id ? { ...e, id_puesto: null } : e,
-      );
-      await saveEmployeeDatabase();
-      renderConfigPage();
-      renderEmployeeDatabase();
-      focusConfigAddInput(configPositionNameInput);
-    });
-
-    configStoreList?.addEventListener('click', async (event) => {
-      const btn = event.target.closest('[data-delete-store]');
-      if (!btn) return;
-      const id = btn.dataset.deleteStore;
-      const store = databaseRowById(state.employeeDatabase.tiendas, 'id_tienda', id);
-      const used = state.employeeDatabase.empleados.filter((e) => String(e.id_tienda) === id).length;
-      const msg = used
-        ? `¿Eliminar la tienda "${store?.nombre_tienda}"? ${used} expediente(s) la usan y quedarán sin tienda.`
-        : `¿Eliminar la tienda "${store?.nombre_tienda}"?`;
-      if (!window.confirm(msg)) return;
-      state.employeeDatabase.tiendas = state.employeeDatabase.tiendas.filter((s) => String(s.id_tienda) !== id);
-      state.employeeDatabase.empleados = state.employeeDatabase.empleados.map((e) =>
-        String(e.id_tienda) === id ? { ...e, id_tienda: null } : e,
-      );
-      await saveEmployeeDatabase();
-      renderConfigPage();
-      renderEmployeeDatabase();
-      focusConfigAddInput(configStoreNameInput);
     });
 
     dayModal.addEventListener('click', (event) => {
@@ -3151,6 +2944,8 @@
     });
   };
 
+  // ─── INICIALIZACIÓN ─────────────────────────────────────────────────────────
+  // Punto de entrada: carga datos, conecta eventos y hace el primer render.
   const init = async () => {
     logInfo('Interfaz iniciando');
     applyTheme(readTheme());

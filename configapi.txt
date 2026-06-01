@@ -1,0 +1,16 @@
+{
+    name:EMPLEADOS
+    Raw JSON Endpoint:https://jsonhosting.com/api/json/07aa8bd8/raw
+    API Endpoint:https://jsonhosting.com/api/json/07aa8bd8
+    Edit Key:54941a6cf4ca89785a4485cbd486617db0aa4ef2b5d939e1cbbc334b5d598d92
+    ID: 07aa8bd8
+    Size: 75546 bytes
+}
+{
+    name:VACACIONES
+    Raw JSON Endpoint:https://jsonhosting.com/api/json/c013efbc/raw
+    API Endpoint:https://jsonhosting.com/api/json/c013efbc
+    Edit Key:f81eb9a6e32079d7661ad4547b2759c16de7382a05b583012a7d8a511e17e3fb
+    ID: c013efbc
+    Size: 15694 bytes
+}

@@ -32,7 +32,6 @@
         <button class="view-button" type="button" data-view="schedules">Horarios</button>
         <button class="view-button" type="button" data-view="employees">Empleados</button>
         <button class="view-button" type="button" data-view="employee-database">Expediente</button>
-        <button class="view-button" type="button" data-view="config">Configuraci&oacute;n</button>
       </div>
 
       <div id="toolbar-actions">
@@ -207,55 +206,6 @@
       </div>
     </section>
 
-    <section id="config-page" class="page hidden">
-      <div class="config-page-inner">
-        <div class="config-page-header">
-          <h2>Configuraci&oacute;n de cat&aacute;logos</h2>
-          <p>Gestiona las &aacute;reas, puestos y tiendas que aparecen como opciones en los expedientes.</p>
-        </div>
-        <div class="config-layout">
-
-          <div class="config-panel">
-            <div class="config-panel-header">
-              <h3 class="config-panel-title">&#127970; &Aacute;reas</h3>
-            </div>
-            <form id="config-area-form" class="config-add-form" autocomplete="off">
-              <input id="config-area-name" class="config-add-input" type="text" placeholder="Nombre del &aacute;rea" maxlength="80">
-              <button class="config-add-btn" type="submit">Agregar</button>
-            </form>
-            <ul id="config-area-list" class="config-list"></ul>
-          </div>
-
-          <div class="config-panel">
-            <div class="config-panel-header">
-              <h3 class="config-panel-title">&#128188; Puestos</h3>
-            </div>
-            <form id="config-position-form" class="config-add-form config-add-form--col" autocomplete="off">
-              <input id="config-position-name" class="config-add-input" type="text" placeholder="Nombre del puesto" maxlength="80">
-              <select id="config-position-area" class="config-add-select">
-                <option value="">Sin &aacute;rea</option>
-              </select>
-              <button class="config-add-btn" type="submit">Agregar</button>
-            </form>
-            <ul id="config-position-list" class="config-list"></ul>
-          </div>
-
-          <div class="config-panel">
-            <div class="config-panel-header">
-              <h3 class="config-panel-title">&#128205; Tiendas</h3>
-            </div>
-            <form id="config-store-form" class="config-add-form config-add-form--col" autocomplete="off">
-              <input id="config-store-name" class="config-add-input" type="text" placeholder="Nombre de la tienda" maxlength="80">
-              <input id="config-store-address" class="config-add-input" type="text" placeholder="Direcci&oacute;n (opcional)" maxlength="255">
-              <button class="config-add-btn" type="submit">Agregar</button>
-            </form>
-            <ul id="config-store-list" class="config-list"></ul>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
   </div>
 
   <div id="day-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="day-modal-title">
@@ -305,7 +255,8 @@
           </label>
           <label class="employee-comment-field">
             <span>Comentario</span>
-            <textarea id="employee-comment" rows="3"></textarea>
+            <textarea id="employee-comment" rows="3">
+            </textarea>
           </label>
         </div>
 
@@ -427,27 +378,22 @@
             <span class="employee-form-section-icon employee-form-section-icon--work">&#128188;</span>
             <h3>Informaci&oacute;n laboral</h3>
           </div>
-          <div id="catalog-empty-hint" class="catalog-empty-hint hidden">
-            &#9888;&#65039; Los cat&aacute;logos est&aacute;n vac&iacute;os. Antes de llenar el expediente, agrega &aacute;reas, puestos y tiendas en la pesta&ntilde;a
-            <button id="go-to-config-btn" class="catalog-hint-link" type="button">Configuraci&oacute;n</button>.
-          </div>
           <div class="employee-form-grid">
             <label>
               <span>&Aacute;rea</span>
-              <select id="employee-database-area">
-                <option value="">&#8212; Sin &aacute;rea &#8212;</option>
-              </select>
+              <input id="employee-database-area" type="text" maxlength="80" autocomplete="off" placeholder="Sin &aacute;rea">
             </label>
             <label>
               <span>Puesto</span>
-              <select id="employee-database-position">
-                <option value="">&#8212; Sin puesto &#8212;</option>
-              </select>
+              <input id="employee-database-position" type="text" maxlength="80" autocomplete="off" placeholder="Sin puesto">
             </label>
             <label>
               <span>Tienda</span>
               <select id="employee-database-store">
                 <option value="">&#8212; Sin tienda &#8212;</option>
+                <option value="Matriz">Matriz</option>
+                <option value="Sucursal">Sucursal</option>
+                <option value="Express">Express</option>
               </select>
             </label>
             <label>
