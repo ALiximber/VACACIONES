@@ -1,4 +1,4 @@
-* {
+﻿* {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -1194,11 +1194,34 @@ button.cell:hover {
 }
 
 .employee-database-table {
-  min-width: 1360px;
+  min-width: 1100px;
+  border-collapse: collapse;
 }
 
+.employee-database-table th,
 .employee-database-table td {
+  padding: 5px 9px;
+  font-size: 11px;
+  border: 1px solid var(--border);
   vertical-align: middle;
+  white-space: nowrap;
+}
+
+.employee-database-table th {
+  background: color-mix(in srgb, var(--header-bg) 100%, var(--panel-muted));
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.employee-database-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--panel-muted) 60%, transparent);
+}
+
+.employee-database-table tbody tr:nth-child(odd) td {
+  background: transparent;
 }
 
 .employee-row {
@@ -1207,6 +1230,14 @@ button.cell:hover {
 
 .employee-row:hover td {
   background: var(--hover);
+}
+
+.employee-database-row {
+  cursor: pointer;
+}
+
+.employee-database-row:hover td {
+  background: var(--hover) !important;
 }
 
 .employees-empty {
@@ -1238,21 +1269,29 @@ button.cell:hover {
   margin-top: 0;
 }
 
-.database-status {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 9px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--panel-muted);
-  color: var(--muted);
+.db-name {
+  font-weight: 700;
   font-size: 11px;
+  color: var(--text);
+}
+
+.db-id {
+  font-size: 10px;
+  color: var(--muted-2);
+  font-weight: 600;
+}
+
+.database-status {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
   font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
 }
 
 .database-status.complete {
-  border-color: color-mix(in srgb, var(--sync-ok) 28%, var(--border));
-  background: color-mix(in srgb, var(--sync-ok) 10%, var(--panel-muted));
   color: color-mix(in srgb, var(--sync-ok) 74%, var(--text));
 }
 
@@ -1511,4 +1550,399 @@ button.cell:hover {
   .schedule-modal {
     border-radius: 20px;
   }
+}
+
+/* ============================================================
+   EXPEDIENTES â€” Toolbar de bÃºsqueda y filtros
+   ============================================================ */
+
+.expediente-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--content-bg);
+  flex-wrap: wrap;
+}
+
+.expediente-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.expediente-search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.expediente-search {
+  width: 100%;
+  padding: 9px 12px 9px 36px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(20, 34, 27, 0.06);
+}
+
+.expediente-search:focus-visible {
+  outline: none;
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-border) 20%, transparent);
+}
+
+.expediente-filter {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(20, 34, 27, 0.06);
+}
+
+.expediente-filter:focus-visible {
+  outline: none;
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-border) 20%, transparent);
+}
+
+.expediente-clear-btn {
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-muted);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.expediente-clear-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* ============================================================
+   EXPEDIENTES â€” Formulario mejorado
+   ============================================================ */
+
+.employee-form-section {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel-muted);
+}
+
+.employee-form-section-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.employee-form-section-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.employee-form-section-icon--personal {
+  background: color-mix(in srgb, var(--active-border) 16%, var(--panel-strong));
+}
+
+.employee-form-section-icon--work {
+  background: color-mix(in srgb, var(--permit-bg) 70%, var(--panel-strong));
+}
+
+.employee-form-section-icon--contact {
+  background: color-mix(in srgb, var(--birthday-bg) 70%, var(--panel-strong));
+}
+
+.employee-form-section h3 {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.expediente-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.expediente-submit-btn {
+  padding: 12px 28px;
+  border: 1px solid color-mix(in srgb, var(--active-border) 38%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--active-border) 12%, var(--panel-strong));
+  color: color-mix(in srgb, var(--active-border) 78%, var(--text));
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.expediente-submit-btn:hover {
+  background: color-mix(in srgb, var(--active-border) 22%, var(--panel-strong));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--active-border) 20%, transparent);
+}
+
+.expediente-submit-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-border) 24%, transparent);
+}
+
+.catalog-empty-hint {
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--permit-border) 60%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--permit-bg) 60%, var(--panel-muted));
+  color: var(--permit-text, var(--text));
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.catalog-hint-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--active-border);
+  font-size: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ============================================================
+   CONFIGURACIÓN — Catálogos
+   ============================================================ */
+
+#config-page {
+  overflow-y: auto;
+}
+
+.config-page-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.config-page-header h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.config-page-header p {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.config-layout {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .config-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.config-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel-strong);
+  overflow: hidden;
+}
+
+.config-panel-header {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.config-panel-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.config-add-form {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-muted);
+}
+
+.config-add-form--col {
+  flex-direction: column;
+}
+
+.config-add-input,
+.config-add-select {
+  flex: 1;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.config-add-input:focus-visible,
+.config-add-select:focus-visible {
+  outline: none;
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-border) 20%, transparent);
+}
+
+.config-add-btn {
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--active-border) 35%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--active-border) 12%, var(--panel-strong));
+  color: color-mix(in srgb, var(--active-border) 80%, var(--text));
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-end;
+  transition: background-color 0.14s ease, transform 0.14s ease;
+}
+
+.config-add-btn:hover {
+  background: color-mix(in srgb, var(--active-border) 22%, var(--panel-strong));
+  transform: translateY(-1px);
+}
+
+.config-list {
+  list-style: none;
+  padding: 6px 0;
+  margin: 0;
+  min-height: 60px;
+  max-height: 420px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.config-empty {
+  padding: 16px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.12s ease;
+}
+
+.config-item:last-child {
+  border-bottom: none;
+}
+
+.config-item:hover {
+  background: var(--hover);
+}
+
+.config-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.config-item-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.config-item-sub {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.config-item-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted-2);
+  background: var(--panel-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.config-delete-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.config-delete-btn:hover {
+  background: var(--danger-bg, color-mix(in srgb, #e03 12%, var(--panel-muted)));
+  border-color: var(--danger-border, color-mix(in srgb, #e03 25%, var(--border)));
+  color: var(--danger-text, #e03);
 }

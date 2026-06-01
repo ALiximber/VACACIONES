@@ -131,6 +131,8 @@
       key: null,
       direction: 'asc',
     },
+    employeeDatabaseSearch: '',
+    employeeDatabaseFilters: { area: '', position: '', store: '' },
   };
 
   const calendarPage = document.querySelector('#calendar-page');
@@ -138,6 +140,7 @@
   const schedulesPage = document.querySelector('#schedules-page');
   const employeesPage = document.querySelector('#employees-page');
   const employeeDatabasePage = document.querySelector('#employee-database-page');
+  const configPage = document.querySelector('#config-page');
   const calendar = document.querySelector('#calendar');
   const employeeGrid = document.querySelector('#employee-grid');
   const scheduleGrid = document.querySelector('#schedule-grid');
@@ -169,6 +172,11 @@
   const employeeDatabaseCount = document.querySelector('#employee-database-count');
   const employeeDatabaseTableBody = document.querySelector('#employee-database-table-body');
   const employeeDatabaseSortButtons = [...document.querySelectorAll('.employee-database-sort')];
+  const expedienteSearch = document.querySelector('#expediente-search');
+  const expedienteAreaFilter = document.querySelector('#expediente-area-filter');
+  const expedientePositionFilter = document.querySelector('#expediente-position-filter');
+  const expedienteStoreFilter = document.querySelector('#expediente-store-filter');
+  const expedienteClearFilters = document.querySelector('#expediente-clear-filters');
   const employeeDatabaseModal = document.querySelector('#employee-database-modal');
   const employeeDatabaseForm = document.querySelector('#employee-database-form');
   const employeeDatabaseModalKicker = document.querySelector('#employee-database-modal-kicker');
@@ -195,9 +203,19 @@
   const employeeDatabasePhoneEmergency2Input = document.querySelector('#employee-database-phone-emergency-2');
   const employeeDatabasePhoneHomeInput = document.querySelector('#employee-database-phone-home');
   const employeeDatabaseAllergiesInput = document.querySelector('#employee-database-allergies');
-  const employeeAreaOptions = document.querySelector('#employee-area-options');
-  const employeePositionOptions = document.querySelector('#employee-position-options');
-  const employeeStoreOptions = document.querySelector('#employee-store-options');
+  const catalogEmptyHint = document.querySelector('#catalog-empty-hint');
+  const goToConfigBtn = document.querySelector('#go-to-config-btn');
+  const configAreaForm = document.querySelector('#config-area-form');
+  const configAreaNameInput = document.querySelector('#config-area-name');
+  const configAreaList = document.querySelector('#config-area-list');
+  const configPositionForm = document.querySelector('#config-position-form');
+  const configPositionNameInput = document.querySelector('#config-position-name');
+  const configPositionAreaSelect = document.querySelector('#config-position-area');
+  const configPositionList = document.querySelector('#config-position-list');
+  const configStoreForm = document.querySelector('#config-store-form');
+  const configStoreNameInput = document.querySelector('#config-store-name');
+  const configStoreAddressInput = document.querySelector('#config-store-address');
+  const configStoreList = document.querySelector('#config-store-list');
   const matrixTitle = document.querySelector('#matrix-title');
   const dayModal = document.querySelector('#day-modal');
   const dayModalTitle = document.querySelector('#day-modal-title');
@@ -1774,6 +1792,8 @@
     employeesPage.classList.toggle('active-page', state.view === 'employees');
     employeeDatabasePage.classList.toggle('hidden', state.view !== 'employee-database');
     employeeDatabasePage.classList.toggle('active-page', state.view === 'employee-database');
+    configPage.classList.toggle('hidden', state.view !== 'config');
+    configPage.classList.toggle('active-page', state.view === 'config');
 
     viewButtons.forEach((button) => {
       button.classList.toggle('active', button.dataset.view === state.view);
@@ -1988,13 +2008,48 @@
             .join('');
   };
 
+  const updateExpedienteFilterDropdowns = (allRows) => {
+    const areas = new Set();
+    const positions = new Set();
+    const stores = new Set();
+
+    allRows.forEach(({ detail, positionLabel, storeLabel }) => {
+      if (detail) {
+        const pos = state.employeeDatabase.puestos.find((p) => p.id_puesto === detail.id_puesto);
+        if (pos) {
+          const area = state.employeeDatabase.areas.find((a) => a.id_area === pos.id_area);
+          if (area) areas.add(area.nombre_area);
+          positions.add(pos.nombre_puesto);
+        }
+        if (storeLabel) stores.add(storeLabel);
+      }
+    });
+
+    const rebuildSelect = (select, values, allLabel) => {
+      const current = select.value;
+      const opts = [`<option value="">${escapeHtml(allLabel)}</option>`];
+      [...values].sort(textCollator.compare.bind(textCollator)).forEach((v) => {
+        opts.push(`<option value="${escapeHtml(v)}"${current === v ? ' selected' : ''}>${escapeHtml(v)}</option>`);
+      });
+      select.innerHTML = opts.join('');
+    };
+
+    rebuildSelect(expedienteAreaFilter, areas, 'Todas las áreas');
+    rebuildSelect(expedientePositionFilter, positions, 'Todos los puestos');
+    rebuildSelect(expedienteStoreFilter, stores, 'Todas las tiendas');
+  };
+
   const renderEmployeeDatabase = () => {
     renderEmployeeDatabaseSortControls();
 
     const currentEmployeeIds = new Set(state.employees.map((employee) => String(employee.id)));
     const filterMonth = state.birthdayMonthFilter;
+    const searchQuery = state.employeeDatabaseSearch.trim().toLowerCase();
+    const filterArea = state.employeeDatabaseFilters.area;
+    const filterPosition = state.employeeDatabaseFilters.position;
+    const filterStore = state.employeeDatabaseFilters.store;
 
-    const filteredEmployees = filterMonth != null
+    const afterBirthday = filterMonth != null
       ? state.employees.filter((employee) => {
           const birthDate = employeeBirthDate(employee);
           if (!birthDate) return false;
@@ -2003,14 +2058,58 @@
         })
       : state.employees;
 
+    const allRows = afterBirthday.map(employeeDatabaseRowData);
+
+    updateExpedienteFilterDropdowns(allRows);
+
+    const filteredRows = allRows.filter((row) => {
+      const { employee, detail, positionLabel, storeLabel } = row;
+
+      if (searchQuery) {
+        const haystack = [
+          employeeName(employee),
+          detail?.curp || '',
+          positionLabel,
+          storeLabel,
+          detail?.correo || '',
+        ].join(' ').toLowerCase();
+        if (!haystack.includes(searchQuery)) return false;
+      }
+
+      if (filterArea) {
+        const pos = detail?.id_puesto
+          ? state.employeeDatabase.puestos.find((p) => p.id_puesto === detail.id_puesto)
+          : null;
+        const area = pos?.id_area
+          ? state.employeeDatabase.areas.find((a) => a.id_area === pos.id_area)
+          : null;
+        if (!area || area.nombre_area !== filterArea) return false;
+      }
+
+      if (filterPosition) {
+        const pos = detail?.id_puesto
+          ? state.employeeDatabase.puestos.find((p) => p.id_puesto === detail.id_puesto)
+          : null;
+        if (!pos || pos.nombre_puesto !== filterPosition) return false;
+      }
+
+      if (filterStore && storeLabel !== filterStore) return false;
+
+      return true;
+    });
+
     const detailsCount = state.employeeDatabase.empleados.filter((detail) =>
       currentEmployeeIds.has(String(detail.id_empleado))
     ).length;
 
+    const hasActiveFilters = searchQuery || filterArea || filterPosition || filterStore;
+
     if (filterMonth != null) {
-      employeeDatabaseCount.textContent = `${filteredEmployees.length} con cumpleaños en ${monthNames[filterMonth]} · ${detailsCount} expedientes de ${state.employees.length} empleados`;
+      employeeDatabaseCount.textContent = `${filteredRows.length} con cumpleaños en ${monthNames[filterMonth]}${hasActiveFilters ? ' (filtrado)' : ''} · ${detailsCount} expedientes de ${state.employees.length} empleados`;
     } else {
-      employeeDatabaseCount.textContent = `${detailsCount} expedientes de ${state.employees.length} empleados`;
+      employeeDatabaseCount.textContent = hasActiveFilters
+        ? `${filteredRows.length} resultado${filteredRows.length !== 1 ? 's' : ''} · ${detailsCount} expedientes de ${state.employees.length} empleados`
+        : `${detailsCount} expedientes de ${state.employees.length} empleados`;
     }
 
     if (state.employees.length === 0) {
@@ -2019,54 +2118,56 @@
       return;
     }
 
-    if (filteredEmployees.length === 0) {
-      const monthLabel = filterMonth != null ? monthNames[filterMonth] : '';
-      employeeDatabaseTableBody.innerHTML =
-        `<tr><td colspan="11" class="employees-empty">Ningún empleado cumple años en ${monthLabel}.</td></tr>`;
+    if (filteredRows.length === 0) {
+      const msg = hasActiveFilters
+        ? 'Ningún empleado coincide con los filtros.'
+        : filterMonth != null
+          ? `Ningún empleado cumple años en ${monthNames[filterMonth]}.`
+          : 'No hay empleados.';
+      employeeDatabaseTableBody.innerHTML = `<tr><td colspan="11" class="employees-empty">${msg}</td></tr>`;
       return;
     }
 
-    const employeeRows = sortedEmployeeDatabaseRows(filteredEmployees.map(employeeDatabaseRowData));
+    const employeeRows = sortedEmployeeDatabaseRows(filteredRows);
 
     employeeDatabaseTableBody.innerHTML = employeeRows
-      .map((row) => {
-        const {
-          employee,
-          detail,
-          age,
-          birthdayLabel,
-          positionLabel,
-          storeLabel,
-          phoneLabel,
-          allergyLabel,
-        } = row;
-        const statusClass = detail ? 'database-status complete' : 'database-status';
-        const statusText = detail ? 'Completo' : 'Sin expediente';
-        const buttonText = detail ? 'Editar' : 'Agregar';
+        .map((row) => {
+          const {
+            employee,
+            detail,
+            age,
+            birthdayLabel,
+            positionLabel,
+            storeLabel,
+            phoneLabel,
+            allergyLabel,
+          } = row;
+          const statusClass = detail ? 'database-status complete' : 'database-status';
+          const statusText = detail ? 'Completo' : 'Sin expediente';
+          const buttonText = detail ? 'Editar' : 'Agregar';
 
-        return `
-          <tr class="employee-database-row" data-employee-id="${employee.id}" title="Click para editar expediente">
-            <td>
-              <strong>${escapeHtml(employeeName(employee))}</strong>
-              <span class="database-subtext">#${escapeHtml(employee.id)}</span>
-              <span class="${statusClass}">${statusText}</span>
-            </td>
-            <td>${detail?.curp ? escapeHtml(detail.curp) : '<span class="database-muted">-</span>'}</td>
-            <td>${age !== '' ? `${age} a&ntilde;os` : '<span class="database-muted">-</span>'}</td>
-            <td>${birthdayLabel ? `<span class="birthday-date-badge">&#127874; ${escapeHtml(birthdayLabel)}</span>` : '<span class="database-muted">-</span>'}</td>
-            <td>${detail?.estado_civil ? escapeHtml(detail.estado_civil) : '<span class="database-muted">-</span>'}</td>
-            <td>${detail?.tipo_sangre ? escapeHtml(detail.tipo_sangre) : '<span class="database-muted">-</span>'}</td>
-            <td>${positionLabel ? escapeHtml(positionLabel) : '<span class="database-muted">-</span>'}</td>
-            <td>${storeLabel ? escapeHtml(storeLabel) : '<span class="database-muted">-</span>'}</td>
-            <td>${phoneLabel || '<span class="database-muted">-</span>'}</td>
-            <td>${allergyLabel ? escapeHtml(allergyLabel) : '<span class="database-muted">-</span>'}</td>
-            <td>
-              <button class="employee-table-action employee-database-edit-button" type="button" data-employee-id="${employee.id}">${buttonText}</button>
-            </td>
-          </tr>
-        `;
-      })
-      .join('');
+          return `
+            <tr class="employee-database-row" data-employee-id="${employee.id}" title="Click para editar expediente">
+              <td>
+                <span class="db-name">${escapeHtml(employeeName(employee))}</span><span class="db-id">&nbsp;#${escapeHtml(String(employee.id))}</span>
+                <span class="${statusClass}">${statusText}</span>
+              </td>
+              <td>${detail?.curp ? escapeHtml(detail.curp) : '<span class="database-muted">-</span>'}</td>
+              <td>${age !== '' ? `${age} a&ntilde;os` : '<span class="database-muted">-</span>'}</td>
+              <td>${birthdayLabel ? `<span class="birthday-date-badge">&#127874; ${escapeHtml(birthdayLabel)}</span>` : '<span class="database-muted">-</span>'}</td>
+              <td>${detail?.estado_civil ? escapeHtml(detail.estado_civil) : '<span class="database-muted">-</span>'}</td>
+              <td>${detail?.tipo_sangre ? escapeHtml(detail.tipo_sangre) : '<span class="database-muted">-</span>'}</td>
+              <td>${positionLabel ? escapeHtml(positionLabel) : '<span class="database-muted">-</span>'}</td>
+              <td>${storeLabel ? escapeHtml(storeLabel) : '<span class="database-muted">-</span>'}</td>
+              <td>${phoneLabel || '<span class="database-muted">-</span>'}</td>
+              <td>${allergyLabel ? escapeHtml(allergyLabel) : '<span class="database-muted">-</span>'}</td>
+              <td>
+                <button class="employee-table-action employee-database-edit-button" type="button" data-employee-id="${employee.id}">${buttonText}</button>
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
   };
 
   const renderControls = () => {
@@ -2084,6 +2185,7 @@
     renderSchedules();
     renderEmployees();
     renderEmployeeDatabase();
+    renderConfigPage();
   };
 
   const openDayModal = (date) => {
@@ -2150,19 +2252,115 @@
     state.editingEmployeeId = null;
   };
 
+  const updateExpedientePositionSelect = () => {
+    const areaId = employeeDatabaseAreaInput.value;
+    const prev = employeeDatabasePositionInput.value;
+    const filtered = areaId
+      ? state.employeeDatabase.puestos.filter((p) => String(p.id_area) === areaId)
+      : state.employeeDatabase.puestos;
+    employeeDatabasePositionInput.innerHTML =
+      '<option value="">— Sin puesto —</option>' +
+      filtered.map((p) => `<option value="${p.id_puesto}">${escapeHtml(p.nombre_puesto)}</option>`).join('');
+    employeeDatabasePositionInput.value = prev;
+  };
+
   const renderEmployeeDatabaseOptions = () => {
     employeeDatabaseEmployeeInput.innerHTML = state.employees
       .map((employee) => `<option value="${escapeHtml(employee.id)}">${escapeHtml(employeeName(employee))}</option>`)
       .join('');
-    employeeAreaOptions.innerHTML = state.employeeDatabase.areas
-      .map((area) => `<option value="${escapeHtml(area.nombre_area)}"></option>`)
-      .join('');
-    employeePositionOptions.innerHTML = state.employeeDatabase.puestos
-      .map((position) => `<option value="${escapeHtml(position.nombre_puesto)}"></option>`)
-      .join('');
-    employeeStoreOptions.innerHTML = state.employeeDatabase.tiendas
-      .map((store) => `<option value="${escapeHtml(store.nombre_tienda)}"></option>`)
-      .join('');
+
+    const hasAreas = state.employeeDatabase.areas.length > 0;
+    const hasPuestos = state.employeeDatabase.puestos.length > 0;
+    const hasTiendas = state.employeeDatabase.tiendas.length > 0;
+    const catalogsEmpty = !hasAreas && !hasPuestos && !hasTiendas;
+    if (catalogEmptyHint) catalogEmptyHint.classList.toggle('hidden', !catalogsEmpty);
+
+    const prevArea = employeeDatabaseAreaInput.value;
+    employeeDatabaseAreaInput.innerHTML =
+      '<option value="">— Sin área —</option>' +
+      state.employeeDatabase.areas
+        .map((a) => `<option value="${a.id_area}">${escapeHtml(a.nombre_area)}</option>`)
+        .join('');
+    employeeDatabaseAreaInput.value = prevArea;
+
+    updateExpedientePositionSelect();
+
+    const prevStore = employeeDatabaseStoreInput.value;
+    employeeDatabaseStoreInput.innerHTML =
+      '<option value="">— Sin tienda —</option>' +
+      state.employeeDatabase.tiendas
+        .map((s) => `<option value="${s.id_tienda}">${escapeHtml(s.nombre_tienda)}</option>`)
+        .join('');
+    employeeDatabaseStoreInput.value = prevStore;
+  };
+
+  const renderConfigPage = () => {
+    if (!configAreaList || !configPositionList || !configStoreList || !configPositionAreaSelect) return;
+    const areas = state.employeeDatabase.areas;
+    const puestos = state.employeeDatabase.puestos;
+    const tiendas = state.employeeDatabase.tiendas;
+
+    configAreaList.innerHTML = areas.length === 0
+      ? '<li class="config-empty">No hay áreas registradas.</li>'
+      : areas.map((area) => {
+          const used = puestos.filter((p) => String(p.id_area) === String(area.id_area)).length;
+          return `<li class="config-item">
+            <div class="config-item-info">
+              <span class="config-item-name">${escapeHtml(area.nombre_area)}</span>
+              ${used ? `<span class="config-item-count">${used} puesto${used !== 1 ? 's' : ''}</span>` : ''}
+            </div>
+            <button class="config-delete-btn" type="button" data-delete-area="${area.id_area}" title="Eliminar">&#10005;</button>
+          </li>`;
+        }).join('');
+
+    const prevSel = configPositionAreaSelect.value;
+    configPositionAreaSelect.innerHTML =
+      '<option value="">Sin área</option>' +
+      areas.map((a) => `<option value="${a.id_area}">${escapeHtml(a.nombre_area)}</option>`).join('');
+    configPositionAreaSelect.value = prevSel;
+
+    configPositionList.innerHTML = puestos.length === 0
+      ? '<li class="config-empty">No hay puestos registrados.</li>'
+      : puestos.map((p) => {
+          const area = p.id_area ? areas.find((a) => String(a.id_area) === String(p.id_area)) : null;
+          const used = state.employeeDatabase.empleados.filter((e) => String(e.id_puesto) === String(p.id_puesto)).length;
+          return `<li class="config-item">
+            <div class="config-item-info">
+              <span class="config-item-name">${escapeHtml(p.nombre_puesto)}</span>
+              ${area ? `<span class="config-item-sub">${escapeHtml(area.nombre_area)}</span>` : ''}
+            </div>
+            ${used ? `<span class="config-item-count">${used} emp.</span>` : ''}
+            <button class="config-delete-btn" type="button" data-delete-position="${p.id_puesto}" title="Eliminar">&#10005;</button>
+          </li>`;
+        }).join('');
+
+    configStoreList.innerHTML = tiendas.length === 0
+      ? '<li class="config-empty">No hay tiendas registradas.</li>'
+      : tiendas.map((s) => {
+          const used = state.employeeDatabase.empleados.filter((e) => String(e.id_tienda) === String(s.id_tienda)).length;
+          return `<li class="config-item">
+            <div class="config-item-info">
+              <span class="config-item-name">${escapeHtml(s.nombre_tienda)}</span>
+              ${s.direccion_tienda ? `<span class="config-item-sub">${escapeHtml(s.direccion_tienda)}</span>` : ''}
+            </div>
+            ${used ? `<span class="config-item-count">${used} emp.</span>` : ''}
+            <button class="config-delete-btn" type="button" data-delete-store="${s.id_tienda}" title="Eliminar">&#10005;</button>
+          </li>`;
+        }).join('');
+  };
+
+  const focusConfigAddInput = (input) => {
+    if (!input) return;
+
+    const focusInput = () => {
+      if (state.view === 'config' && document.contains(input)) {
+        input.focus({ preventScroll: true });
+      }
+    };
+
+    focusInput();
+    window.requestAnimationFrame(focusInput);
+    window.setTimeout(focusInput, 200);
   };
 
   const fillEmployeeDatabaseForm = (employeeId) => {
@@ -2198,9 +2396,10 @@
     employeeDatabaseEmailInput.value = detail?.correo || '';
     employeeDatabaseSchoolingInput.value = detail?.escolaridad || '';
     employeeDatabaseChildrenInput.value = detail?.num_hijos ?? 0;
-    employeeDatabaseAreaInput.value = area?.nombre_area || '';
-    employeeDatabasePositionInput.value = position?.nombre_puesto || '';
-    employeeDatabaseStoreInput.value = store?.nombre_tienda || '';
+    employeeDatabaseAreaInput.value = area?.id_area ? String(area.id_area) : '';
+    updateExpedientePositionSelect();
+    employeeDatabasePositionInput.value = position?.id_puesto ? String(position.id_puesto) : '';
+    employeeDatabaseStoreInput.value = store?.id_tienda ? String(store.id_tienda) : '';
     employeeDatabaseStoreAddressInput.value = store?.direccion_tienda || '';
     employeeDatabaseAccountInput.value = detail?.num_cuenta || '';
     employeeDatabaseCardInput.value = detail?.num_tarjeta || '';
@@ -2280,9 +2479,8 @@
       return;
     }
 
-    const areaId = upsertDatabaseArea(employeeDatabaseAreaInput.value);
-    const positionId = upsertDatabasePosition(employeeDatabasePositionInput.value, areaId);
-    const storeId = upsertDatabaseStore(employeeDatabaseStoreInput.value, employeeDatabaseStoreAddressInput.value);
+    const positionId = positiveIntegerOrNull(employeeDatabasePositionInput.value);
+    const storeId = positiveIntegerOrNull(employeeDatabaseStoreInput.value);
     const detail = {
       ...detailBase,
       id_puesto: positionId,
@@ -2613,6 +2811,7 @@
       button.addEventListener('click', () => {
         state.view = button.dataset.view;
         renderView();
+        if (state.view === 'config') renderConfigPage();
       });
     });
 
@@ -2664,6 +2863,12 @@
     closeEmployeeModalButton.addEventListener('click', closeEmployeeModal);
     closeScheduleModalButton.addEventListener('click', closeScheduleModal);
     closeEmployeeDatabaseModalButton.addEventListener('click', closeEmployeeDatabaseModal);
+    goToConfigBtn?.addEventListener('click', () => {
+      closeEmployeeDatabaseModal();
+      state.view = 'config';
+      renderView();
+      renderConfigPage();
+    });
     addEmployeeButton.addEventListener('click', () => openEmployeeModal());
     addEmployeeDatabaseButton.addEventListener('click', () => openEmployeeDatabaseModal());
     scheduleTypeInput.addEventListener('change', setScheduleTimeInputsEnabled);
@@ -2671,8 +2876,53 @@
       fillEmployeeDatabaseForm(employeeDatabaseEmployeeInput.value);
     });
 
+    employeeDatabaseAreaInput.addEventListener('change', () => {
+      updateExpedientePositionSelect();
+    });
+
+    employeeDatabaseStoreInput.addEventListener('change', () => {
+      const storeId = employeeDatabaseStoreInput.value;
+      const store = storeId
+        ? databaseRowById(state.employeeDatabase.tiendas, 'id_tienda', storeId)
+        : null;
+      if (store?.direccion_tienda) {
+        employeeDatabaseStoreAddressInput.value = store.direccion_tienda;
+      } else if (!storeId) {
+        employeeDatabaseStoreAddressInput.value = '';
+      }
+    });
+
     birthdayMonthFilterInput?.addEventListener('change', () => {
       state.birthdayMonthFilter = birthdayMonthFilterInput.value !== '' ? Number(birthdayMonthFilterInput.value) : null;
+      renderEmployeeDatabase();
+    });
+
+    expedienteSearch?.addEventListener('input', () => {
+      state.employeeDatabaseSearch = expedienteSearch.value;
+      renderEmployeeDatabase();
+    });
+
+    expedienteAreaFilter?.addEventListener('change', () => {
+      state.employeeDatabaseFilters.area = expedienteAreaFilter.value;
+      renderEmployeeDatabase();
+    });
+
+    expedientePositionFilter?.addEventListener('change', () => {
+      state.employeeDatabaseFilters.position = expedientePositionFilter.value;
+      renderEmployeeDatabase();
+    });
+
+    expedienteStoreFilter?.addEventListener('change', () => {
+      state.employeeDatabaseFilters.store = expedienteStoreFilter.value;
+      renderEmployeeDatabase();
+    });
+
+    expedienteClearFilters?.addEventListener('click', () => {
+      state.employeeDatabaseSearch = '';
+      state.employeeDatabaseFilters = { area: '', position: '', store: '' };
+      state.birthdayMonthFilter = null;
+      if (expedienteSearch) expedienteSearch.value = '';
+      if (birthdayMonthFilterInput) birthdayMonthFilterInput.value = '';
       renderEmployeeDatabase();
     });
 
@@ -2680,6 +2930,125 @@
       button.addEventListener('click', () => {
         setEmployeeDatabaseSort(button.dataset.sortKey);
       });
+    });
+
+    configAreaForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = trimmedText(configAreaNameInput.value, 80);
+      if (!name) { configAreaNameInput.focus(); return; }
+      if (databaseRowByName(state.employeeDatabase.areas, 'nombre_area', name)) {
+        window.alert('Ya existe un área con ese nombre.');
+        configAreaNameInput.focus();
+        return;
+      }
+      state.employeeDatabase.areas.push({
+        id_area: nextDatabaseId(state.employeeDatabase.areas, 'id_area'),
+        nombre_area: name,
+      });
+      configAreaForm.reset();
+      await saveEmployeeDatabase();
+      renderConfigPage();
+      focusConfigAddInput(configAreaNameInput);
+    });
+
+    configPositionForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = trimmedText(configPositionNameInput.value, 80);
+      if (!name) { configPositionNameInput.focus(); return; }
+      if (databaseRowByName(state.employeeDatabase.puestos, 'nombre_puesto', name)) {
+        window.alert('Ya existe un puesto con ese nombre.');
+        configPositionNameInput.focus();
+        return;
+      }
+      const areaId = positiveIntegerOrNull(configPositionAreaSelect.value);
+      state.employeeDatabase.puestos.push({
+        id_puesto: nextDatabaseId(state.employeeDatabase.puestos, 'id_puesto'),
+        nombre_puesto: name,
+        id_area: areaId,
+      });
+      configPositionForm.reset();
+      await saveEmployeeDatabase();
+      renderConfigPage();
+      focusConfigAddInput(configPositionNameInput);
+    });
+
+    configStoreForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = trimmedText(configStoreNameInput.value, 80);
+      if (!name) { configStoreNameInput.focus(); return; }
+      if (databaseRowByName(state.employeeDatabase.tiendas, 'nombre_tienda', name)) {
+        window.alert('Ya existe una tienda con ese nombre.');
+        configStoreNameInput.focus();
+        return;
+      }
+      state.employeeDatabase.tiendas.push({
+        id_tienda: nextDatabaseId(state.employeeDatabase.tiendas, 'id_tienda'),
+        nombre_tienda: name,
+        direccion_tienda: trimmedText(configStoreAddressInput.value, 255),
+      });
+      configStoreForm.reset();
+      await saveEmployeeDatabase();
+      renderConfigPage();
+      focusConfigAddInput(configStoreNameInput);
+    });
+
+    configAreaList?.addEventListener('click', async (event) => {
+      const btn = event.target.closest('[data-delete-area]');
+      if (!btn) return;
+      const id = btn.dataset.deleteArea;
+      const area = databaseRowById(state.employeeDatabase.areas, 'id_area', id);
+      const linked = state.employeeDatabase.puestos.filter((p) => String(p.id_area) === id).length;
+      const msg = linked
+        ? `¿Eliminar el área "${area?.nombre_area}"? Tiene ${linked} puesto(s) vinculado(s) que quedarán sin área.`
+        : `¿Eliminar el área "${area?.nombre_area}"?`;
+      if (!window.confirm(msg)) return;
+      state.employeeDatabase.areas = state.employeeDatabase.areas.filter((a) => String(a.id_area) !== id);
+      state.employeeDatabase.puestos = state.employeeDatabase.puestos.map((p) =>
+        String(p.id_area) === id ? { ...p, id_area: null } : p,
+      );
+      await saveEmployeeDatabase();
+      renderConfigPage();
+      focusConfigAddInput(configAreaNameInput);
+    });
+
+    configPositionList?.addEventListener('click', async (event) => {
+      const btn = event.target.closest('[data-delete-position]');
+      if (!btn) return;
+      const id = btn.dataset.deletePosition;
+      const pos = databaseRowById(state.employeeDatabase.puestos, 'id_puesto', id);
+      const used = state.employeeDatabase.empleados.filter((e) => String(e.id_puesto) === id).length;
+      const msg = used
+        ? `¿Eliminar el puesto "${pos?.nombre_puesto}"? ${used} expediente(s) lo usan y quedarán sin puesto.`
+        : `¿Eliminar el puesto "${pos?.nombre_puesto}"?`;
+      if (!window.confirm(msg)) return;
+      state.employeeDatabase.puestos = state.employeeDatabase.puestos.filter((p) => String(p.id_puesto) !== id);
+      state.employeeDatabase.empleados = state.employeeDatabase.empleados.map((e) =>
+        String(e.id_puesto) === id ? { ...e, id_puesto: null } : e,
+      );
+      await saveEmployeeDatabase();
+      renderConfigPage();
+      renderEmployeeDatabase();
+      focusConfigAddInput(configPositionNameInput);
+    });
+
+    configStoreList?.addEventListener('click', async (event) => {
+      const btn = event.target.closest('[data-delete-store]');
+      if (!btn) return;
+      const id = btn.dataset.deleteStore;
+      const store = databaseRowById(state.employeeDatabase.tiendas, 'id_tienda', id);
+      const used = state.employeeDatabase.empleados.filter((e) => String(e.id_tienda) === id).length;
+      const msg = used
+        ? `¿Eliminar la tienda "${store?.nombre_tienda}"? ${used} expediente(s) la usan y quedarán sin tienda.`
+        : `¿Eliminar la tienda "${store?.nombre_tienda}"?`;
+      if (!window.confirm(msg)) return;
+      state.employeeDatabase.tiendas = state.employeeDatabase.tiendas.filter((s) => String(s.id_tienda) !== id);
+      state.employeeDatabase.empleados = state.employeeDatabase.empleados.map((e) =>
+        String(e.id_tienda) === id ? { ...e, id_tienda: null } : e,
+      );
+      await saveEmployeeDatabase();
+      renderConfigPage();
+      renderEmployeeDatabase();
+      focusConfigAddInput(configStoreNameInput);
     });
 
     dayModal.addEventListener('click', (event) => {

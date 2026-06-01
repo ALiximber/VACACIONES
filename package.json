@@ -14,6 +14,7 @@
   "devDependencies": {
     "@electron-forge/cli": "^7.11.1",
     "@electron-forge/maker-squirrel": "^7.11.1",
-    "electron": "^36.9.5"
+    "electron": "^36.9.5",
+    "playwright-core": "^1.60.0"
   }
 }

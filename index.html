@@ -32,6 +32,7 @@
         <button class="view-button" type="button" data-view="schedules">Horarios</button>
         <button class="view-button" type="button" data-view="employees">Empleados</button>
         <button class="view-button" type="button" data-view="employee-database">Expediente</button>
+        <button class="view-button" type="button" data-view="config">Configuraci&oacute;n</button>
       </div>
 
       <div id="toolbar-actions">
@@ -144,7 +145,7 @@
             </div>
             <div class="employee-panel-header-actions">
               <label class="birthday-filter-label">
-                <span>🎂 Cumpleaños en</span>
+                <span>&#127874; Cumplea&ntilde;os</span>
                 <select id="birthday-month-filter" class="birthday-filter-select">
                   <option value="">Todos los meses</option>
                   <option value="0">Enero</option>
@@ -163,6 +164,23 @@
               </label>
               <button id="add-employee-database-button" class="employee-submit" type="button">Agregar expediente</button>
             </div>
+          </div>
+
+          <div class="expediente-toolbar">
+            <div class="expediente-search-wrap">
+              <span class="expediente-search-icon">&#128269;</span>
+              <input id="expediente-search" class="expediente-search" type="text" placeholder="Buscar nombre, CURP, puesto, tienda..." autocomplete="off">
+            </div>
+            <select id="expediente-area-filter" class="expediente-filter">
+              <option value="">Todas las &aacute;reas</option>
+            </select>
+            <select id="expediente-position-filter" class="expediente-filter">
+              <option value="">Todos los puestos</option>
+            </select>
+            <select id="expediente-store-filter" class="expediente-filter">
+              <option value="">Todas las tiendas</option>
+            </select>
+            <button id="expediente-clear-filters" class="expediente-clear-btn" type="button">Limpiar</button>
           </div>
 
           <div class="employees-table-wrap">
@@ -186,6 +204,55 @@
             </table>
           </div>
         </section>
+      </div>
+    </section>
+
+    <section id="config-page" class="page hidden">
+      <div class="config-page-inner">
+        <div class="config-page-header">
+          <h2>Configuraci&oacute;n de cat&aacute;logos</h2>
+          <p>Gestiona las &aacute;reas, puestos y tiendas que aparecen como opciones en los expedientes.</p>
+        </div>
+        <div class="config-layout">
+
+          <div class="config-panel">
+            <div class="config-panel-header">
+              <h3 class="config-panel-title">&#127970; &Aacute;reas</h3>
+            </div>
+            <form id="config-area-form" class="config-add-form" autocomplete="off">
+              <input id="config-area-name" class="config-add-input" type="text" placeholder="Nombre del &aacute;rea" maxlength="80">
+              <button class="config-add-btn" type="submit">Agregar</button>
+            </form>
+            <ul id="config-area-list" class="config-list"></ul>
+          </div>
+
+          <div class="config-panel">
+            <div class="config-panel-header">
+              <h3 class="config-panel-title">&#128188; Puestos</h3>
+            </div>
+            <form id="config-position-form" class="config-add-form config-add-form--col" autocomplete="off">
+              <input id="config-position-name" class="config-add-input" type="text" placeholder="Nombre del puesto" maxlength="80">
+              <select id="config-position-area" class="config-add-select">
+                <option value="">Sin &aacute;rea</option>
+              </select>
+              <button class="config-add-btn" type="submit">Agregar</button>
+            </form>
+            <ul id="config-position-list" class="config-list"></ul>
+          </div>
+
+          <div class="config-panel">
+            <div class="config-panel-header">
+              <h3 class="config-panel-title">&#128205; Tiendas</h3>
+            </div>
+            <form id="config-store-form" class="config-add-form config-add-form--col" autocomplete="off">
+              <input id="config-store-name" class="config-add-input" type="text" placeholder="Nombre de la tienda" maxlength="80">
+              <input id="config-store-address" class="config-add-input" type="text" placeholder="Direcci&oacute;n (opcional)" maxlength="255">
+              <button class="config-add-btn" type="submit">Agregar</button>
+            </form>
+            <ul id="config-store-list" class="config-list"></ul>
+          </div>
+
+        </div>
       </div>
     </section>
 
@@ -292,12 +359,12 @@
       </div>
 
       <form id="employee-database-form" class="employee-modal-body">
-        <datalist id="employee-area-options"></datalist>
-        <datalist id="employee-position-options"></datalist>
-        <datalist id="employee-store-options"></datalist>
 
         <div class="employee-form-section">
-          <h3>Empleado</h3>
+          <div class="employee-form-section-header">
+            <span class="employee-form-section-icon employee-form-section-icon--personal">&#128100;</span>
+            <h3>Datos personales</h3>
+          </div>
           <div class="employee-form-grid">
             <label class="employee-wide-field">
               <span>Empleado</span>
@@ -356,22 +423,35 @@
         </div>
 
         <div class="employee-form-section">
-          <h3>Trabajo</h3>
+          <div class="employee-form-section-header">
+            <span class="employee-form-section-icon employee-form-section-icon--work">&#128188;</span>
+            <h3>Informaci&oacute;n laboral</h3>
+          </div>
+          <div id="catalog-empty-hint" class="catalog-empty-hint hidden">
+            &#9888;&#65039; Los cat&aacute;logos est&aacute;n vac&iacute;os. Antes de llenar el expediente, agrega &aacute;reas, puestos y tiendas en la pesta&ntilde;a
+            <button id="go-to-config-btn" class="catalog-hint-link" type="button">Configuraci&oacute;n</button>.
+          </div>
           <div class="employee-form-grid">
             <label>
-              <span>Area</span>
-              <input id="employee-database-area" list="employee-area-options" type="text" maxlength="80" autocomplete="off">
+              <span>&Aacute;rea</span>
+              <select id="employee-database-area">
+                <option value="">&#8212; Sin &aacute;rea &#8212;</option>
+              </select>
             </label>
             <label>
               <span>Puesto</span>
-              <input id="employee-database-position" list="employee-position-options" type="text" maxlength="80" autocomplete="off">
+              <select id="employee-database-position">
+                <option value="">&#8212; Sin puesto &#8212;</option>
+              </select>
             </label>
             <label>
               <span>Tienda</span>
-              <input id="employee-database-store" list="employee-store-options" type="text" maxlength="80" autocomplete="off">
+              <select id="employee-database-store">
+                <option value="">&#8212; Sin tienda &#8212;</option>
+              </select>
             </label>
             <label>
-              <span>Direccion tienda</span>
+              <span>Direcci&oacute;n tienda</span>
               <input id="employee-database-store-address" type="text" maxlength="255" autocomplete="off">
             </label>
             <label>
@@ -386,7 +466,10 @@
         </div>
 
         <div class="employee-form-section">
-          <h3>Contacto</h3>
+          <div class="employee-form-section-header">
+            <span class="employee-form-section-icon employee-form-section-icon--contact">&#128222;</span>
+            <h3>Contacto y salud</h3>
+          </div>
           <div class="employee-form-grid">
             <label>
               <span>Telefono personal</span>
@@ -411,7 +494,9 @@
           </div>
         </div>
 
-        <button id="employee-database-submit" class="employee-submit" type="submit">Guardar expediente</button>
+        <div class="expediente-form-footer">
+          <button id="employee-database-submit" class="expediente-submit-btn" type="submit">Guardar expediente</button>
+        </div>
       </form>
     </div>
   </div>
