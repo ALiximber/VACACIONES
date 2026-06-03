@@ -65,6 +65,15 @@
   const employeeCivilStatuses = ['Soltero', 'Casado', 'Divorciado', 'Viudo', 'Union Libre'];
   const employeeBloodTypes = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
   const employeePhoneTypes = ['Personal', 'Emergencia1', 'Emergencia2', 'Casa'];
+  const employeesSortDefaults = {
+    name: 'asc',
+    startDate: 'asc',
+    lastName: 'asc',
+    vacationDays: 'desc',
+    remainingDays: 'desc',
+    salary: 'desc',
+    comment: 'asc',
+  };
   const employeeDatabaseSortDefaults = {
     employee: 'asc',
     curp: 'asc',
@@ -142,6 +151,10 @@
     theme: 'light',
     needsVacationDataSave: false,
     birthdayMonthFilter: null,
+    employeesSort: {
+      key: null,
+      direction: 'asc',
+    },
     employeeDatabaseSort: {
       key: null,
       direction: 'asc',
@@ -170,6 +183,7 @@
   const employeeCommentInput = document.querySelector('#employee-comment');
   const employeesCount = document.querySelector('#employees-count');
   const employeesTableBody = document.querySelector('#employees-table-body');
+  const employeesSortButtons = [...document.querySelectorAll('.employees-sort')];
   const employeeModal = document.querySelector('#employee-modal');
   const employeeModalKicker = document.querySelector('#employee-modal-kicker');
   const employeeModalTitle = document.querySelector('#employee-modal-title');
@@ -220,6 +234,7 @@
   const employeeDatabasePhoneHomeInput = document.querySelector('#employee-database-phone-home');
   const employeeDatabaseAllergiesInput = document.querySelector('#employee-database-allergies');
   const matrixTitle = document.querySelector('#matrix-title');
+  const downloadMatrixReportButton = document.querySelector('#download-matrix-report');
   const dayModal = document.querySelector('#day-modal');
   const dayModalTitle = document.querySelector('#day-modal-title');
   const dayModalContent = document.querySelector('#day-modal-content');
@@ -1417,6 +1432,60 @@
     renderEmployeeDatabase();
   };
 
+  const employeesSortValue = (employee, key) => {
+    switch (key) {
+      case 'name': return employee.nombre || '';
+      case 'startDate': return employee.fecha_ingreso || '';
+      case 'lastName': return [employee.apellido_paterno, employee.apellido_materno].filter(Boolean).join(' ');
+      case 'vacationDays': return vacationDaysForEmployee(employee);
+      case 'remainingDays': return remainingVacationDaysForEmployee(employee);
+      case 'salary': return Number(employee.salario_diario || 0);
+      case 'comment': return employee.comentario || '';
+      default: return '';
+    }
+  };
+
+  const sortedEmployeeRows = (employees) => {
+    const { key, direction } = state.employeesSort;
+    if (!employeesSortDefaults[key]) return employees;
+    return [...employees].sort((a, b) => {
+      const result = compareEmployeeDatabaseSortValues(
+        employeesSortValue(a, key),
+        employeesSortValue(b, key),
+        direction,
+      );
+      if (result !== 0) return result;
+      return textCollator.compare(employeeName(a), employeeName(b));
+    });
+  };
+
+  const renderEmployeesSortControls = () => {
+    employeesSortButtons.forEach((button) => {
+      const active = button.dataset.sortKey === state.employeesSort.key;
+      const direction = active ? state.employeesSort.direction : '';
+      const header = button.closest('th');
+      button.classList.toggle('active', active);
+      button.dataset.sortDirection = direction;
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      button.title = active
+        ? `Orden ${direction === 'desc' ? 'descendente' : 'ascendente'}. Click para invertir.`
+        : 'Click para ordenar esta columna.';
+      if (header) {
+        header.setAttribute('aria-sort', active ? (direction === 'desc' ? 'descending' : 'ascending') : 'none');
+      }
+    });
+  };
+
+  const setEmployeesSort = (sortKey) => {
+    if (!employeesSortDefaults[sortKey]) return;
+    const current = state.employeesSort;
+    const direction = current.key === sortKey
+      ? (current.direction === 'asc' ? 'desc' : 'asc')
+      : employeesSortDefaults[sortKey];
+    state.employeesSort = { key: sortKey, direction };
+    renderEmployees();
+  };
+
   const getReason = (reasonId) => reasons.find((reason) => reason.id === reasonId);
 
   const hasEmployeeVacation = (employee, key) => vacationDaysForEmployeeRecord(employee).includes(key);
@@ -1959,6 +2028,285 @@
     `;
   };
 
+  const downloadMatrixReport = () => {
+    const daysInMonth = new Date(state.year, state.month + 1, 0).getDate();
+    const days = Array.from({ length: daysInMonth }, (_item, index) => index + 1);
+    const matrixRefDate = new Date(state.year, state.month + 1, 0);
+    const weekdayInitials = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+    const esc = (v) => String(v ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+    const reasonColors = { V: '#4ade80', D: '#60a5fa', I: '#f87171', P: '#facc15' };
+    const reasonTextColors = { V: '#14532d', D: '#1e3a5f', I: '#7f1d1d', P: '#78350f' };
+
+    const dayHeaders = days.map((day) => {
+      const weekday = new Date(state.year, state.month, day).getDay();
+      const isWeekend = weekday === 0 || weekday === 6;
+      return `<th class="${isWeekend ? 'weekend' : ''}">${day}<br><small>${weekdayInitials[weekday]}</small></th>`;
+    }).join('');
+
+    const employeeRows = state.employees.map((employee) => {
+      const name = esc(employeeName(employee));
+      const dayCells = days.map((day) => {
+        const key = dateKey(state.year, state.month, day);
+        const reasonId = getEmployeeDayReason(employee, key);
+        const weekday = new Date(state.year, state.month, day).getDay();
+        const isWeekend = weekday === 0 || weekday === 6;
+        const bg = reasonColors[reasonId] || '';
+        const color = reasonTextColors[reasonId] || '';
+        const style = bg ? ` style="background:${bg};color:${color};font-weight:600"` : (isWeekend ? ' class="weekend"' : '');
+        return `<td${style}>${esc(reasonId)}</td>`;
+      }).join('');
+      const vacDays = vacationDaysForEmployee(employee);
+      const remaining = remainingVacationDaysForEmployee(employee, matrixRefDate);
+      return `<tr><td class="name-cell">${name}</td>${dayCells}<td class="summary-cell">${vacDays}</td><td class="summary-cell">${remaining}</td></tr>`;
+    }).join('');
+
+    const legendRows = [
+      { id: 'V', label: 'Vacaciones', bg: '#4ade80', color: '#14532d' },
+      { id: 'D', label: 'Descanso trabajado', bg: '#60a5fa', color: '#1e3a5f' },
+      { id: 'I', label: 'Incapacidad', bg: '#f87171', color: '#7f1d1d' },
+      { id: 'P', label: 'Permiso', bg: '#facc15', color: '#78350f' },
+    ].map(({ id, label, bg, color }) =>
+      `<span class="legend-item" style="background:${bg};color:${color}">${id} = ${label}</span>`,
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe de vacaciones - ${esc(monthNames[state.month])} ${state.year}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #111; padding: 16px; }
+    h1 { font-size: 15px; margin-bottom: 4px; }
+    .subtitle { font-size: 10px; color: #555; margin-bottom: 10px; }
+    .legend { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .legend-item { padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; text-align: center; padding: 3px 2px; white-space: nowrap; }
+    th { background: #f3f4f6; font-size: 9px; }
+    th.weekend, td.weekend { background: #f9fafb; color: #9ca3af; }
+    td.name-cell { text-align: left; padding-left: 6px; font-weight: 500; min-width: 140px; max-width: 180px; white-space: normal; word-break: break-word; }
+    td.summary-cell { font-weight: 700; background: #f3f4f6; }
+    tr:nth-child(even) td { background-color: #fafafa; }
+    tr:nth-child(even) td.summary-cell { background: #ececec; }
+    @page { size: A3 landscape; margin: 12mm; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <h1>Informe de vacaciones &mdash; ${esc(monthNames[state.month])} ${state.year}</h1>
+  <p class="subtitle">Generado el ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+  <div class="legend">${legendRows}</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:left">Empleado</th>
+        ${dayHeaders}
+        <th>Dias vac.</th>
+        <th>Restantes</th>
+      </tr>
+    </thead>
+    <tbody>${employeeRows}</tbody>
+  </table>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  const printEmployeePDF = (employeeId) => {
+    const employee = state.employees.find((e) => String(e.id) === String(employeeId));
+    if (!employee) return;
+    const detail = employeeDatabaseDetailById(employeeId);
+    if (!detail) return;
+
+    const position = detail.id_puesto
+      ? databaseRowById(state.employeeDatabase.puestos, 'id_puesto', detail.id_puesto)
+      : null;
+    const area = position?.id_area
+      ? databaseRowById(state.employeeDatabase.areas, 'id_area', position.id_area)
+      : null;
+    const store = detail.id_tienda
+      ? databaseRowById(state.employeeDatabase.tiendas, 'id_tienda', detail.id_tienda)
+      : null;
+    const phones = employeeDatabasePhonesForEmployee(employeeId);
+    const allergies = employeeDatabaseAllergiesForEmployee(employeeId);
+    const age = detail.fecha_nacimiento ? ageFromBirthDate(detail.fecha_nacimiento) : '';
+    const vacDays = vacationDaysForEmployee(employee);
+    const remaining = remainingVacationDaysForEmployee(employee);
+
+    const esc = (v) => String(v ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    const field = (label, value) => value
+      ? `<div class="field"><span class="label">${esc(label)}</span><span class="value">${esc(value)}</span></div>`
+      : `<div class="field"><span class="label">${esc(label)}</span><span class="value empty">—</span></div>`;
+    const phoneMap = Object.fromEntries(phones.map((p) => [p.tipo, p.numero]));
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Expediente — ${esc(employeeName(employee))}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; background: #fff; }
+    .page { max-width: 800px; margin: 0 auto; padding: 32px 40px; }
+
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e3a5f; padding-bottom: 14px; margin-bottom: 20px; }
+    .header-left h1 { font-size: 20px; color: #1e3a5f; font-weight: 700; }
+    .header-left p { font-size: 10px; color: #555; margin-top: 2px; }
+    .header-right { text-align: right; }
+    .id-badge { font-size: 12px; font-weight: 700; color: #1e3a5f; border: 2px solid #1e3a5f; padding: 4px 10px; border-radius: 6px; }
+    .issue-date { font-size: 9px; color: #777; margin-top: 6px; }
+
+    .avatar { width: 80px; height: 80px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 32px; color: #6b7280; border: 2px solid #d1d5db; margin-bottom: 12px; }
+    .employee-name { font-size: 18px; font-weight: 700; color: #111; margin-bottom: 2px; }
+    .employee-meta { font-size: 10px; color: #555; }
+
+    .name-section { display: flex; gap: 20px; align-items: center; background: #f8fafc; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+
+    .section { margin-bottom: 18px; }
+    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #1e3a5f; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 10px; }
+    .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; }
+    .fields-grid.three-col { grid-template-columns: 1fr 1fr 1fr; }
+    .field { display: flex; flex-direction: column; }
+    .label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 1px; }
+    .value { font-size: 11px; color: #111; }
+    .value.empty { color: #aaa; font-style: italic; }
+
+    .vac-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .vac-card { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 10px 14px; text-align: center; }
+    .vac-card .num { font-size: 26px; font-weight: 700; color: #0369a1; line-height: 1; }
+    .vac-card .lbl { font-size: 9px; color: #0369a1; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; justify-content: space-between; gap: 30px; }
+    .signature { flex: 1; text-align: center; }
+    .signature-line { border-bottom: 1px solid #333; margin-bottom: 5px; height: 40px; }
+    .signature-label { font-size: 9px; color: #555; }
+
+    @page { size: A4; margin: 0; }
+    @media print { body { padding: 0; } .page { padding: 24px 32px; max-width: 100%; } }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-left">
+      <h1>Expediente de empleado</h1>
+      <p>Vidrioelectrica &mdash; Recursos Humanos</p>
+    </div>
+    <div class="header-right">
+      <div class="id-badge">ID #${esc(String(employee.id))}</div>
+      <div class="issue-date">Emitido: ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+    </div>
+  </div>
+
+  <div class="name-section">
+    <div class="avatar">&#128100;</div>
+    <div>
+      <div class="employee-name">${esc(employeeName(employee))}</div>
+      <div class="employee-meta">${esc(position ? position.nombre_puesto : '')}${area ? ` &mdash; ${esc(area.nombre_area)}` : ''}${store ? ` &mdash; ${esc(store.nombre_tienda)}` : ''}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Datos personales</div>
+    <div class="fields-grid three-col">
+      ${field('CURP', detail.curp)}
+      ${field('Fecha de nacimiento', detail.fecha_nacimiento)}
+      ${field('Edad', age ? `${age} años` : '')}
+      ${field('Estado civil', detail.estado_civil)}
+      ${field('Tipo de sangre', detail.tipo_sangre)}
+      ${field('Escolaridad', detail.escolaridad)}
+      ${field('Núm. hijos', detail.num_hijos != null ? String(detail.num_hijos) : '')}
+      ${field('Correo', detail.correo)}
+    </div>
+    <div style="margin-top:8px">
+      ${field('Dirección', detail.direccion)}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Información laboral</div>
+    <div class="fields-grid three-col">
+      ${field('Fecha de ingreso', employee.fecha_ingreso)}
+      ${field('Puesto', position ? position.nombre_puesto : '')}
+      ${field('Área', area ? area.nombre_area : '')}
+      ${field('Tienda', store ? store.nombre_tienda : '')}
+      ${field('Dirección tienda', store ? store.direccion_tienda : '')}
+      ${field('Cuenta bancaria', detail.num_cuenta)}
+      ${field('Número de tarjeta', detail.num_tarjeta)}
+      ${field('Salario diario', employee.salario_diario != null ? `$${Number(employee.salario_diario).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '')}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Contacto</div>
+    <div class="fields-grid">
+      ${field('Teléfono personal', phoneMap['Personal'])}
+      ${field('Emergencia 1', phoneMap['Emergencia1'])}
+      ${field('Emergencia 2', phoneMap['Emergencia2'])}
+      ${field('Teléfono casa', phoneMap['Casa'])}
+    </div>
+  </div>
+
+  ${allergies.length > 0 ? `
+  <div class="section">
+    <div class="section-title">Alergias y condiciones de salud</div>
+    <div class="value">${esc(allergies.map((a) => a.descripcion).join(', '))}</div>
+  </div>` : ''}
+
+  <div class="section">
+    <div class="section-title">Vacaciones</div>
+    <div class="vac-grid">
+      <div class="vac-card">
+        <div class="num">${vacDays}</div>
+        <div class="lbl">Días correspondientes</div>
+      </div>
+      <div class="vac-card">
+        <div class="num">${remaining}</div>
+        <div class="lbl">Días restantes</div>
+      </div>
+    </div>
+  </div>
+
+  ${employee.comentario ? `
+  <div class="section">
+    <div class="section-title">Comentarios</div>
+    <div class="value">${esc(employee.comentario)}</div>
+  </div>` : ''}
+
+  <div class="footer">
+    <div class="signature">
+      <div class="signature-line"></div>
+      <div class="signature-label">Firma del empleado</div>
+    </div>
+    <div class="signature">
+      <div class="signature-line"></div>
+      <div class="signature-label">Recursos Humanos</div>
+    </div>
+    <div class="signature">
+      <div class="signature-line"></div>
+      <div class="signature-label">Autorización</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   const renderSchedules = () => {
     if (state.employees.length === 0) {
       scheduleGrid.style.gridTemplateColumns = '1fr';
@@ -2005,11 +2353,13 @@
 
   const renderEmployees = () => {
     employeesCount.textContent = `${state.employees.length} registrados`;
+    renderEmployeesSortControls();
 
+    const displayEmployees = sortedEmployeeRows(state.employees);
     employeesTableBody.innerHTML =
-      state.employees.length === 0
+      displayEmployees.length === 0
         ? '<tr><td colspan="8" class="employees-empty">No hay empleados registrados.</td></tr>'
-        : state.employees
+        : displayEmployees
             .map((employee) => {
               const fullName = escapeHtml(employee.nombre || '');
               const lastNames = escapeHtml(
@@ -2193,8 +2543,9 @@
               <td>${storeLabel ? escapeHtml(storeLabel) : '<span class="database-muted">-</span>'}</td>
               <td>${phoneLabel || '<span class="database-muted">-</span>'}</td>
               <td>${allergyLabel ? escapeHtml(allergyLabel) : '<span class="database-muted">-</span>'}</td>
-              <td>
+              <td class="employee-database-actions-cell">
                 <button class="employee-table-action employee-database-edit-button" type="button" data-employee-id="${employee.id}">${buttonText}</button>
+                ${detail ? `<button class="employee-table-action employee-database-pdf-button" type="button" data-employee-id="${employee.id}">PDF</button>` : ''}
               </td>
             </tr>
           `;
@@ -2838,6 +3189,12 @@
       renderEmployeeDatabase();
     });
 
+    employeesSortButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        setEmployeesSort(button.dataset.sortKey);
+      });
+    });
+
     employeeDatabaseSortButtons.forEach((button) => {
       button.addEventListener('click', () => {
         setEmployeeDatabaseSort(button.dataset.sortKey);
@@ -2895,6 +3252,10 @@
       openScheduleModal(cell.dataset.employeeId, cell.dataset.day);
     });
 
+    downloadMatrixReportButton?.addEventListener('click', () => {
+      downloadMatrixReport();
+    });
+
     employeeGrid.addEventListener('click', async (event) => {
       const cell = event.target.closest('.matrix-cell');
       if (!cell) {
@@ -2920,6 +3281,13 @@
     });
 
     employeeDatabaseTableBody.addEventListener('click', (event) => {
+      const pdfButton = event.target.closest('.employee-database-pdf-button');
+      if (pdfButton) {
+        event.stopPropagation();
+        printEmployeePDF(pdfButton.dataset.employeeId);
+        return;
+      }
+
       const button = event.target.closest('.employee-database-edit-button');
       const row = event.target.closest('.employee-database-row');
       const employeeId = button?.dataset.employeeId || row?.dataset.employeeId;

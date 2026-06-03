@@ -1539,26 +1539,22 @@ const startLanDiscovery = async () =>
       resolve();
     });
   });
-
 const stopLanDiscovery = () =>
   new Promise((resolve) => {
     if (lanAnnouncementTimer) {
       clearInterval(lanAnnouncementTimer);
       lanAnnouncementTimer = null;
     }
-
     if (!lanDiscoverySocket) {
       resolve();
       return;
     }
-
     lanDiscoverySocket.close(() => {
       lanDiscoverySocket = null;
       lanPeers.clear();
       resolve();
     });
-  });
-
+  }); 
 const startLanSync = async () => {
   await startLanHttpServer();
   await startLanDiscovery();

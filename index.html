@@ -78,6 +78,7 @@
           <span><b class="legend-box reason-i">I</b> Incapacidad</span>
           <span><b class="legend-box reason-p">P</b> Permiso</span>
         </div>
+        <button id="download-matrix-report" class="employee-submit" type="button">Imprimir / PDF</button>
       </div>
 
       <div id="employee-grid-wrap">
@@ -117,13 +118,13 @@
             <table class="employees-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Ingreso</th>
-                  <th>Apellidos</th>
-                  <th>Dias</th>
-                  <th>Restantes</th>
-                  <th>Salario</th>
-                  <th>Comentario</th>
+                  <th aria-sort="none"><button class="table-sort-button employees-sort" type="button" data-sort-key="name">Nombre<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employees-sort" type="button" data-sort-key="startDate">Ingreso<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employees-sort" type="button" data-sort-key="lastName">Apellidos<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employees-sort" type="button" data-sort-key="vacationDays">Dias<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employees-sort" type="button" data-sort-key="remainingDays">Restantes<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employees-sort" type="button" data-sort-key="salary">Salario<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employees-sort" type="button" data-sort-key="comment">Comentario<span class="sort-indicator" aria-hidden="true"></span></button></th>
                   <th></th>
                 </tr>
               </thead>
@@ -372,7 +373,6 @@
             </label>
           </div>
         </div>
-
         <div class="employee-form-section">
           <div class="employee-form-section-header">
             <span class="employee-form-section-icon employee-form-section-icon--work">&#128188;</span>
@@ -410,7 +410,6 @@
             </label>
           </div>
         </div>
-
         <div class="employee-form-section">
           <div class="employee-form-section-header">
             <span class="employee-form-section-icon employee-form-section-icon--contact">&#128222;</span>
@@ -439,14 +438,12 @@
             </label>
           </div>
         </div>
-
         <div class="expediente-form-footer">
           <button id="employee-database-submit" class="expediente-submit-btn" type="submit">Guardar expediente</button>
         </div>
       </form>
     </div>
   </div>
-
   <script src="index.js"></script>
 </body>
 </html>

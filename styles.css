@@ -1119,6 +1119,23 @@ button.cell:hover {
   white-space: nowrap;
 }
 
+.employee-database-actions-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.employee-database-pdf-button {
+  color: var(--accent, #1e3a5f);
+  border-color: var(--accent, #1e3a5f) !important;
+  font-weight: 600;
+}
+
+.employee-database-pdf-button:hover {
+  background: var(--accent, #1e3a5f) !important;
+  color: #fff !important;
+}
+
 .employees-table-wrap {
   flex: 1;
   min-height: 0;
