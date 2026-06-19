@@ -1,9 +1,124 @@
 {
   "empleados": [
     {
+      "id_empleado": 1,
+      "nombre": "AUDOLINA SOTO VALDOVINOS",
+      "curp": "SOVA710419MMNTLD04",
+      "nss": "53957015075",
+      "fecha_nacimiento": "1971-04-19",
+      "estado_civil": "Soltero",
+      "tipo_sangre": "",
+      "direccion": "CONOCIDO OPOPEO, CP. 61820",
+      "correo": "ody.soto.vald@gmail.com",
+      "num_cuenta": "149 882 6412",
+      "num_tarjeta": "4152 3137 6751 3091",
+      "escolaridad": "",
+      "num_hijos": 0,
+      "fecha_ingreso": "1994-05-14",
+      "salario": 0,
+      "id_puesto": 1,
+      "id_tienda": 1
+    },
+    {
+      "id_empleado": 2,
+      "nombre": "ERENDIRA PAMATZ MATA",
+      "curp": "PAME800603MMCMTR09",
+      "nss": "53988022561",
+      "fecha_nacimiento": "1980-06-03",
+      "estado_civil": "Soltero",
+      "tipo_sangre": "O-",
+      "direccion": "Calle Matamoros #46, Col. Centro, Opopeo, Mich.",
+      "correo": "pamatzerendira@gmail.com",
+      "num_cuenta": "149 882 9144",
+      "num_tarjeta": "4152 3139 3902 7756",
+      "escolaridad": "Preparatoria",
+      "num_hijos": 0,
+      "fecha_ingreso": "1999-09-21",
+      "salario": 0,
+      "id_puesto": 1,
+      "id_tienda": 2
+    },
+    {
+      "id_empleado": 3,
+      "nombre": "JUAN MANUEL JUAREZ PURECO",
+      "curp": "JUPJ791024HMNRRN08",
+      "nss": "53017918656",
+      "fecha_nacimiento": "1979-10-24",
+      "estado_civil": "Casado",
+      "tipo_sangre": "",
+      "direccion": "PRIVADA SAN JUDAS 40 A, COL. LLANO DE LA VIRGEN 61605, PATZCUARO MICH.",
+      "correo": "juan.jjr234@icloud.com",
+      "num_cuenta": "149 885 9590",
+      "num_tarjeta": "4152 3137 6751 3083",
+      "escolaridad": "Primaria",
+      "num_hijos": 4,
+      "fecha_ingreso": "1997-03-23",
+      "salario": 0,
+      "id_puesto": 2,
+      "id_tienda": 1
+    },
+    {
+      "id_empleado": 4,
+      "nombre": "VIOLETA HERNANDEZ HUERTA",
+      "curp": "HEHV760424MDFRRL06",
+      "nss": "53017615906",
+      "fecha_nacimiento": "1976-04-24",
+      "estado_civil": "Soltero",
+      "tipo_sangre": "O+",
+      "direccion": "AV. LAZARO CARDENAS 15 DEPTO 1, CENTRO, PATZCUARO MICH.",
+      "correo": "flakita_ram@hotmail.com",
+      "num_cuenta": "158 308 2116",
+      "num_tarjeta": "4152 3140 2852 6286",
+      "escolaridad": "Secundaria",
+      "num_hijos": 2,
+      "fecha_ingreso": "2001-06-07",
+      "salario": 0,
+      "id_puesto": 3,
+      "id_tienda": 1
+    },
+    {
+      "id_empleado": 11,
+      "nombre": "SANDRA CONTRERAS OROZCO",
+      "curp": "COOS880129MMNNRN02",
+      "nss": "03228860767",
+      "fecha_nacimiento": "1988-01-29",
+      "estado_civil": "Casado",
+      "tipo_sangre": "",
+      "direccion": "CALLE FRANCISCO JAVIER CLAVIJERO 26, COL. COLIMILLAS, PATZCUARO MICH.",
+      "correo": "sc5294315@gmail.com",
+      "num_cuenta": "154 680 9133",
+      "num_tarjeta": "4152 3140 2462 9720",
+      "escolaridad": "Primaria",
+      "num_hijos": 3,
+      "fecha_ingreso": "2020-03-15",
+      "salario": 339,
+      "id_puesto": 2,
+      "id_tienda": 1
+    },
+    {
+      "id_empleado": 28,
+      "nombre": "AURELIO RUIZ MAXIMILIANO",
+      "curp": "RUMA801210HMNZXR03",
+      "nss": "30968007150",
+      "fecha_nacimiento": "1980-12-10",
+      "estado_civil": "Casado",
+      "tipo_sangre": "O+",
+      "direccion": "AROCUTIN, DOM. CONOCIDO, ENTRE CALLE PRINCIPAL Y PLAZA PRINCIPAL",
+      "correo": "",
+      "num_cuenta": "",
+      "num_tarjeta": "",
+      "escolaridad": "Preparatoria",
+      "num_hijos": 2,
+      "fecha_ingreso": "2023-01-18",
+      "salario": 339,
+      "id_puesto": 2,
+      "id_tienda": 1
+    },
+    {
       "id_empleado": 50,
       "nombre": "DEMIAN TELLEZ CALZADA",
       "curp": "TECD060228HMNLLMA0",
+      "nss": "",
       "fecha_nacimiento": "2006-02-28",
       "estado_civil": "Soltero",
       "tipo_sangre": "",
@@ -19,16 +134,153 @@
       "id_tienda": null
     }
   ],
-  "puestos": [],
-  "areas": [],
-  "tiendas": [],
-  "telefonos": [],
+  "puestos": [
+    {
+      "id_puesto": 1,
+      "nombre_puesto": "Encargada de tienda",
+      "id_area": 1
+    },
+    {
+      "id_puesto": 2,
+      "nombre_puesto": "Empleado de mostrador",
+      "id_area": 2
+    },
+    {
+      "id_puesto": 3,
+      "nombre_puesto": "Coordinadora",
+      "id_area": 3
+    }
+  ],
+  "areas": [
+    {
+      "id_area": 1,
+      "nombre_area": "Caja"
+    },
+    {
+      "id_area": 2,
+      "nombre_area": "Ferreteria"
+    },
+    {
+      "id_area": 3,
+      "nombre_area": "Material Electrico"
+    }
+  ],
+  "tiendas": [
+    {
+      "id_tienda": 1,
+      "nombre_tienda": "Matriz",
+      "direccion_tienda": ""
+    },
+    {
+      "id_tienda": 2,
+      "nombre_tienda": "Sucursal",
+      "direccion_tienda": ""
+    }
+  ],
+  "telefonos": [
+    {
+      "id_telefono": 1,
+      "id_empleado": 11,
+      "numero": "434 167 6008",
+      "tipo": "Personal"
+    },
+    {
+      "id_telefono": 2,
+      "id_empleado": 11,
+      "numero": "434 131 9649 - Gala",
+      "tipo": "Emergencia1"
+    },
+    {
+      "id_telefono": 3,
+      "id_empleado": 11,
+      "numero": "434 131 3811 Esposo",
+      "tipo": "Emergencia2"
+    },
+    {
+      "id_telefono": 4,
+      "id_empleado": 28,
+      "numero": "443 946 5008",
+      "tipo": "Personal"
+    },
+    {
+      "id_telefono": 5,
+      "id_empleado": 28,
+      "numero": "443 378 2528 - Isa",
+      "tipo": "Emergencia1"
+    },
+    {
+      "id_telefono": 6,
+      "id_empleado": 28,
+      "numero": "434 136 0726 Leticia",
+      "tipo": "Emergencia2"
+    },
+    {
+      "id_telefono": 7,
+      "id_empleado": 2,
+      "numero": "434 265 3457",
+      "tipo": "Personal"
+    },
+    {
+      "id_telefono": 8,
+      "id_empleado": 2,
+      "numero": "434 105 4259 Daniel",
+      "tipo": "Emergencia1"
+    },
+    {
+      "id_telefono": 9,
+      "id_empleado": 2,
+      "numero": "434 114 8886 Minerva",
+      "tipo": "Emergencia2"
+    },
+    {
+      "id_telefono": 10,
+      "id_empleado": 3,
+      "numero": "434 120 8141",
+      "tipo": "Personal"
+    },
+    {
+      "id_telefono": 11,
+      "id_empleado": 3,
+      "numero": "434 120 4923 Blanca",
+      "tipo": "Emergencia1"
+    },
+    {
+      "id_telefono": 12,
+      "id_empleado": 3,
+      "numero": "434 135 1347 Angel",
+      "tipo": "Emergencia2"
+    },
+    {
+      "id_telefono": 13,
+      "id_empleado": 4,
+      "numero": "434 128 1477",
+      "tipo": "Personal"
+    },
+    {
+      "id_telefono": 14,
+      "id_empleado": 4,
+      "numero": "4341089450 Antonieta",
+      "tipo": "Emergencia1"
+    },
+    {
+      "id_telefono": 15,
+      "id_empleado": 4,
+      "numero": "434 107 4625 Jorge",
+      "tipo": "Emergencia2"
+    },
+    {
+      "id_telefono": 16,
+      "id_empleado": 50,
+      "numero": "81 3502 0643",
+      "tipo": "Personal"
+    }
+  ],
   "alergias": [],
   "__sync": {
     "version": 1,
     "dataset": "employeeDatabase",
-    "source": "6d763b43-9531-4dfa-ac94-c103df4a47d2",
-    "updatedAt": "2026-06-01T15:57:46.999Z",
+    "source": "c33f5f48-061d-45c7-b6fe-5ecde38a1da3",
+    "updatedAt": "2026-06-19T16:37:27.392Z",
     "pendingUpload": false
   }
 }

@@ -169,7 +169,7 @@
           <div class="expediente-toolbar">
             <div class="expediente-search-wrap">
               <span class="expediente-search-icon">&#128269;</span>
-              <input id="expediente-search" class="expediente-search" type="text" placeholder="Buscar nombre, CURP, puesto, tienda..." autocomplete="off">
+              <input id="expediente-search" class="expediente-search" type="text" placeholder="Buscar nombre, CURP, NSS, puesto, tienda..." autocomplete="off">
             </div>
             <select id="expediente-area-filter" class="expediente-filter">
               <option value="">Todas las &aacute;reas</option>
@@ -189,6 +189,7 @@
                 <tr>
                   <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="employee">Empleado<span class="sort-indicator" aria-hidden="true"></span></button></th>
                   <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="curp">CURP<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                  <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="nss">NSS<span class="sort-indicator" aria-hidden="true"></span></button></th>
                   <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="age">Edad<span class="sort-indicator" aria-hidden="true"></span></button></th>
                   <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="birthday">Cumplea&ntilde;os<span class="sort-indicator" aria-hidden="true"></span></button></th>
                   <th aria-sort="none"><button class="table-sort-button employee-database-sort" type="button" data-sort-key="status">Estado<span class="sort-indicator" aria-hidden="true"></span></button></th>
@@ -311,6 +312,7 @@
       </div>
 
       <form id="employee-database-form" class="employee-modal-body">
+        <div id="employee-database-form-alert" class="expediente-form-alert hidden" role="alert" aria-live="assertive"></div>
 
         <div class="employee-form-section">
           <div class="employee-form-section-header">
@@ -325,6 +327,10 @@
             <label>
               <span>CURP</span>
               <input id="employee-database-curp" type="text" maxlength="18" autocomplete="off" required>
+            </label>
+            <label>
+              <span>NSS</span>
+              <input id="employee-database-nss" type="text" maxlength="11" inputmode="numeric" autocomplete="off">
             </label>
             <label>
               <span>Fecha de nacimiento</span>

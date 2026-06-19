@@ -41,7 +41,7 @@ const lanSyncDiscoveryPort = 41234;
 const lanSyncHttpPreferredPort = 41235;
 const lanSyncAnnouncementIntervalMs = 5000;
 const lanSyncPeerTimeoutMs = 20000;
-const lanSyncRequestTimeoutMs = 3000;
+const lanSyncRequestTimeoutMs = 10000;
 const lanSyncMaxPayloadBytes = 1024 * 1024;
 // ─── ESTADO DE SINCRONIZACIÓN ────────────────────────────────────────────────
 // Refleja el estado actual de cada dataset (empleados, vacaciones, expedientes)
@@ -394,12 +394,15 @@ const withSyncMetadata = (data, datasetKey, pendingUpload) => ({
   },
 });
 
+const hasCloudSyncConfig = () =>
+  Object.keys(datasetDefinitions).some((datasetKey) => Boolean(apiConfig?.[datasetKey]));
+
 const setDatasetSyncState = (datasetKey, patch) => {
   syncState.datasets[datasetKey] = {
     ...syncState.datasets[datasetKey],
     ...patch,
   };
-  syncState.enabled = Boolean(apiConfig?.employees || apiConfig?.vacations);
+  syncState.enabled = hasCloudSyncConfig();
   syncState.lastError = Object.values(syncState.datasets).find((dataset) => dataset.lastError)?.lastError || null;
   emitSyncStatus();
 };
@@ -407,6 +410,8 @@ const setDatasetSyncState = (datasetKey, patch) => {
 const syncStatusSnapshot = () => JSON.parse(JSON.stringify(syncState));
 
 const datasetUpdatedAt = (data) => normalizeSyncMetadata(data?.__sync)?.updatedAt || null;
+
+const datasetSyncSource = (data) => String(normalizeSyncMetadata(data?.__sync)?.source || '');
 
 const timestampToMs = (value) => {
   if (!value) {
@@ -417,16 +422,50 @@ const timestampToMs = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
-const incomingDatasetWins = (incomingData, currentData) => {
+const datasetSyncDetails = (data) => ({
+  updatedAt: datasetUpdatedAt(data),
+  source: datasetSyncSource(data),
+  pendingUpload: Boolean(normalizeSyncMetadata(data?.__sync)?.pendingUpload),
+});
+
+const compareDatasetsForSync = (incomingData, currentData) => {
+  if (stableJson(incomingData) === stableJson(currentData)) {
+    return 'same';
+  }
+
   const incomingStamp = timestampToMs(datasetUpdatedAt(incomingData));
   const currentStamp = timestampToMs(datasetUpdatedAt(currentData));
 
-  if (!incomingStamp && !currentStamp) {
-    return stableJson(incomingData) !== stableJson(currentData);
+  if (incomingStamp && !currentStamp) {
+    return 'incoming';
   }
 
-  return incomingStamp >= currentStamp;
+  if (!incomingStamp && currentStamp) {
+    return 'current';
+  }
+
+  if (incomingStamp !== currentStamp) {
+    return incomingStamp > currentStamp ? 'incoming' : 'current';
+  }
+
+  const incomingSource = datasetSyncSource(incomingData);
+  const currentSource = datasetSyncSource(currentData);
+
+  if (!incomingSource && !currentSource) {
+    return 'current';
+  }
+
+  if (incomingSource === currentSource) {
+    return 'current';
+  }
+
+  return incomingSource > currentSource ? 'incoming' : 'current';
 };
+
+const incomingDatasetWins = (incomingData, currentData) =>
+  compareDatasetsForSync(incomingData, currentData) === 'incoming';
+
+const syncReasonUsesLan = (reason = '') => String(reason).startsWith('lan-');
 
 // ─── UTILIDADES DE RED LOCAL (LAN) ───────────────────────────────────────────
 // La sincronización LAN usa UDP para descubrimiento (broadcast) y HTTP para
@@ -480,16 +519,19 @@ const lanBroadcastAddresses = () => {
 
 // El token LAN es un hash SHA-256 de las claves de edición configuradas.
 // Así solo los equipos que comparten la misma configuración pueden intercambiar datos.
-const localLanSyncToken = () =>
-  createHash('sha256')
-    .update(
-      JSON.stringify({
-        appId: lanSyncAppId,
-        employees: apiConfig?.employees?.editKey || '',
-        vacations: apiConfig?.vacations?.editKey || '',
-      }),
-    )
-    .digest('hex');
+const localLanSyncToken = () => {
+  const tokenSource = {
+    appId: lanSyncAppId,
+    employees: apiConfig?.employees?.editKey || '',
+    vacations: apiConfig?.vacations?.editKey || '',
+  };
+
+  if (apiConfig?.employeeDatabase?.editKey) {
+    tokenSource.employeeDatabase = apiConfig.employeeDatabase.editKey;
+  }
+
+  return createHash('sha256').update(JSON.stringify(tokenSource)).digest('hex');
+};
 
 const jsonResponse = (response, statusCode, payload) => {
   response.writeHead(statusCode, {
@@ -610,7 +652,30 @@ const applyIncomingDataset = async (datasetKey, data, reason = 'lan-update') => 
   const currentData = await readDatasetData(datasetKey);
   const changed = stableJson(incomingData) !== stableJson(currentData);
 
-  if (!changed || !incomingDatasetWins(incomingData, currentData)) {
+  if (!changed) {
+    return false;
+  }
+
+  if (apiConfigForDataset(datasetKey) && syncReasonUsesLan(reason)) {
+    logAppEvent('info', 'Actualizacion LAN recibida; se usara nube como autoridad', {
+      datasetKey,
+      reason,
+      incoming: datasetSyncDetails(incomingData),
+      current: datasetSyncDetails(currentData),
+    });
+    syncDatasetFromCloud(datasetKey, { notify: true }).catch(() => {});
+    return false;
+  }
+
+  if (!incomingDatasetWins(incomingData, currentData)) {
+    logAppEvent('info', 'Dataset entrante ignorado por no ser mas reciente', {
+      datasetKey,
+      reason,
+      incoming: datasetSyncDetails(incomingData),
+      current: datasetSyncDetails(currentData),
+      incomingSummary: datasetLogSummary(datasetKey, incomingData),
+      currentSummary: datasetLogSummary(datasetKey, currentData),
+    });
     return false;
   }
 
@@ -680,10 +745,23 @@ const pullNewerDatasetsFromPeer = async (peer) => {
 
   for (const datasetKey of Object.keys(datasetDefinitions)) {
     if (await shouldPullDatasetFromPeer(datasetKey, versions[datasetKey])) {
+      if (apiConfigForDataset(datasetKey)) {
+        await syncDatasetFromCloud(datasetKey, { notify: true }).catch((error) => {
+          logAppEvent('warn', 'No se pudo sincronizar desde nube tras aviso LAN', {
+            datasetKey,
+            peer: normalizeIpAddress(peer.address),
+            port: peer.httpPort,
+            error,
+          });
+        });
+        continue;
+      }
+
       await pullDatasetFromPeer(peer, datasetKey).catch((error) => {
         logAppEvent('warn', 'No se pudo traer dataset desde equipo LAN', {
           datasetKey,
           peer: normalizeIpAddress(peer.address),
+          port: peer.httpPort,
           error,
         });
       });
@@ -724,6 +802,7 @@ const broadcastDatasetToLanPeers = async (datasetKey, data) => {
         logAppEvent('warn', 'No se pudo enviar dataset a equipo LAN', {
           datasetKey,
           peer: normalizeIpAddress(peer.address),
+          port: peer.httpPort,
           error,
         });
       }),
@@ -783,11 +862,12 @@ const loadApiConfig = async () => {
     apiConfig = {
       employees: parsedConfig.EMPLEADOS || null,
       vacations: parsedConfig.VACACIONES || null,
+      employeeDatabase: parsedConfig.EMPLEADOS_BD || null,
     };
-    syncState.enabled = Boolean(apiConfig.employees || apiConfig.vacations);
+    syncState.enabled = hasCloudSyncConfig();
     syncState.lastError = null;
   } catch (error) {
-    apiConfig = { employees: null, vacations: null };
+    apiConfig = { employees: null, vacations: null, employeeDatabase: null };
     syncState.enabled = false;
     syncState.lastError = error.message;
     logAppEvent('warn', 'No se pudo leer configapi.txt; se usara modo local/LAN', { error });
@@ -953,6 +1033,9 @@ const normalizeBloodType = (value) => {
   return employeeBloodTypes.includes(text) ? text : '';
 };
 
+const normalizeSocialSecurityNumber = (value) =>
+  trimmedText(value, 20).replace(/\D/g, '').slice(0, 11);
+
 const normalizeTableById = (rows = [], normalizer, idKey) => {
   const normalizedById = new Map();
 
@@ -971,6 +1054,7 @@ const normalizeEmployeeDatabaseEmployee = (employee = {}) => ({
   id_empleado: positiveIntegerOrNull(employee.id_empleado ?? employee.id),
   nombre: trimmedText(employee.nombre, 100),
   curp: trimmedText(employee.curp, 18).toUpperCase(),
+  nss: normalizeSocialSecurityNumber(employee.nss ?? employee.numero_seguridad_social),
   fecha_nacimiento: normalizeDateString(employee.fecha_nacimiento),
   estado_civil: normalizeCivilStatus(employee.estado_civil),
   tipo_sangre: normalizeBloodType(employee.tipo_sangre),
@@ -1205,9 +1289,9 @@ const syncDatasetFromCloud = async (datasetKey, options = {}) => {
 
   try {
     const cloudData = normalizeDatasetData(datasetKey, await downloadCloudJson(datasetKey));
-    const changed = stableJson(localData) !== stableJson(cloudData);
+    const syncDecision = compareDatasetsForSync(cloudData, localData);
 
-    if (changed) {
+    if (syncDecision === 'incoming') {
       await writeDatasetData(datasetKey, cloudData);
       logAppEvent('info', 'Dataset descargado desde la nube', {
         datasetKey,
@@ -1218,6 +1302,18 @@ const syncDatasetFromCloud = async (datasetKey, options = {}) => {
       }
     }
 
+    if (syncDecision === 'current') {
+      logAppEvent('info', 'Dataset local mas reciente que nube; se subira para reparar sincronizacion', {
+        datasetKey,
+        local: datasetSyncDetails(localData),
+        cloud: datasetSyncDetails(cloudData),
+        localSummary: datasetLogSummary(datasetKey, localData),
+        cloudSummary: datasetLogSummary(datasetKey, cloudData),
+      });
+      await syncDatasetToCloud(datasetKey);
+      return true;
+    }
+
     syncState.lastSyncAt = new Date().toISOString();
     setDatasetSyncState(datasetKey, {
       syncing: false,
@@ -1225,7 +1321,7 @@ const syncDatasetFromCloud = async (datasetKey, options = {}) => {
       lastDownloadAt: syncState.lastSyncAt,
       lastError: null,
     });
-    return changed;
+    return syncDecision === 'incoming';
   } catch (error) {
     setDatasetSyncState(datasetKey, {
       syncing: false,
@@ -1250,6 +1346,30 @@ const syncDatasetToCloud = async (datasetKey) => {
 
   try {
     const localData = await readDatasetData(datasetKey);
+    const remoteData = normalizeDatasetData(datasetKey, await downloadCloudJson(datasetKey));
+    const remoteDecision = compareDatasetsForSync(remoteData, localData);
+
+    if (remoteDecision === 'incoming') {
+      await writeDatasetData(datasetKey, remoteData);
+
+      syncState.lastSyncAt = new Date().toISOString();
+      setDatasetSyncState(datasetKey, {
+        syncing: false,
+        pendingUpload: false,
+        lastDownloadAt: syncState.lastSyncAt,
+        lastError: null,
+      });
+      emitDataUpdated(datasetKey, 'cloud-newer');
+      logAppEvent('warn', 'Subida cancelada porque la nube tiene datos mas recientes', {
+        datasetKey,
+        local: datasetSyncDetails(localData),
+        cloud: datasetSyncDetails(remoteData),
+        localSummary: datasetLogSummary(datasetKey, localData),
+        cloudSummary: datasetLogSummary(datasetKey, remoteData),
+      });
+      return false;
+    }
+
     const cloudData = withSyncMetadata(localData, datasetKey, false);
 
     await uploadCloudJson(datasetKey, cloudData);
@@ -1514,6 +1634,10 @@ const handleLanAnnouncement = async (buffer, remoteInfo) => {
   lanPeers.set(payload.instanceId, peer);
 
   if (!previousPeer || previousPeer.address !== peer.address || previousPeer.httpPort !== peer.httpPort) {
+    logAppEvent('info', 'Equipo LAN detectado', {
+      peer: peer.address,
+      port: peer.httpPort,
+    });
     await pullNewerDatasetsFromPeer(peer).catch(() => {});
     return;
   }

@@ -77,6 +77,7 @@
   const employeeDatabaseSortDefaults = {
     employee: 'asc',
     curp: 'asc',
+    nss: 'asc',
     age: 'desc',
     birthday: 'asc',
     status: 'asc',
@@ -209,12 +210,14 @@
   const expedienteClearFilters = document.querySelector('#expediente-clear-filters');
   const employeeDatabaseModal = document.querySelector('#employee-database-modal');
   const employeeDatabaseForm = document.querySelector('#employee-database-form');
+  const employeeDatabaseFormAlert = document.querySelector('#employee-database-form-alert');
   const employeeDatabaseModalKicker = document.querySelector('#employee-database-modal-kicker');
   const employeeDatabaseModalTitle = document.querySelector('#employee-database-modal-title');
   const closeEmployeeDatabaseModalButton = document.querySelector('#close-employee-database-modal');
   const employeeDatabaseSubmit = document.querySelector('#employee-database-submit');
   const employeeDatabaseEmployeeInput = document.querySelector('#employee-database-employee');
   const employeeDatabaseCurpInput = document.querySelector('#employee-database-curp');
+  const employeeDatabaseNssInput = document.querySelector('#employee-database-nss');
   const employeeDatabaseBirthDateInput = document.querySelector('#employee-database-birth-date');
   const employeeDatabaseCivilStatusInput = document.querySelector('#employee-database-civil-status');
   const employeeDatabaseBloodTypeInput = document.querySelector('#employee-database-blood-type');
@@ -600,6 +603,9 @@
     return employeeBloodTypes.includes(text) ? text : '';
   };
 
+  const normalizeSocialSecurityNumber = (value) =>
+    trimmedText(value, 20).replace(/\D/g, '').slice(0, 11);
+
   const normalizeTableById = (rows = [], normalizer, idKey) => {
     const normalizedById = new Map();
 
@@ -618,6 +624,7 @@
     id_empleado: positiveIntegerOrNull(employee.id_empleado ?? employee.id),
     nombre: trimmedText(employee.nombre, 100),
     curp: trimmedText(employee.curp, 18).toUpperCase(),
+    nss: normalizeSocialSecurityNumber(employee.nss ?? employee.numero_seguridad_social),
     fecha_nacimiento: normalizeDateString(employee.fecha_nacimiento),
     estado_civil: normalizeCivilStatus(employee.estado_civil),
     tipo_sangre: normalizeBloodType(employee.tipo_sangre),
@@ -1009,6 +1016,8 @@
   const duplicateEmployeeDatabaseValue = (field, value, employeeId) => {
     const normalizedValue = field === 'curp'
       ? trimmedText(value, 18).toUpperCase()
+      : field === 'nss'
+        ? normalizeSocialSecurityNumber(value)
       : field === 'correo'
         ? trimmedText(value, 120).toLowerCase()
         : trimmedText(value, 20);
@@ -1024,6 +1033,8 @@
 
       const candidate = field === 'curp'
         ? trimmedText(detail[field], 18).toUpperCase()
+        : field === 'nss'
+          ? normalizeSocialSecurityNumber(detail[field])
         : field === 'correo'
           ? trimmedText(detail[field], 120).toLowerCase()
           : trimmedText(detail[field], 20);
@@ -1035,6 +1046,7 @@
   const validateEmployeeDatabaseUniqueFields = (detail) => {
     const fieldLabels = {
       curp: 'CURP',
+      nss: 'NSS',
       correo: 'correo',
       num_cuenta: 'cuenta bancaria',
       num_tarjeta: 'tarjeta',
@@ -1047,7 +1059,10 @@
         return true;
       }
 
-      window.alert(`El ${fieldLabels[field]} ya esta registrado en otro empleado.`);
+      showEmployeeDatabaseValidation(
+        `El ${fieldLabels[field]} ya esta registrado en otro empleado.`,
+        employeeDatabaseInputForField(field),
+      );
       return false;
     });
   };
@@ -1361,6 +1376,7 @@
       sortValues: {
         employee: employeeName(employee),
         curp: detail?.curp || '',
+        nss: detail?.nss || '',
         age: age === '' ? null : age,
         birthday: birthParts ? birthParts.month * 100 + birthParts.day : null,
         status: detail?.estado_civil || '',
@@ -2046,20 +2062,25 @@
 
     const employeeRows = state.employees.map((employee) => {
       const name = esc(employeeName(employee));
+      let hasMarkedDay = false;
       const dayCells = days.map((day) => {
         const key = dateKey(state.year, state.month, day);
         const reasonId = getEmployeeDayReason(employee, key);
         const weekday = new Date(state.year, state.month, day).getDay();
         const isWeekend = weekday === 0 || weekday === 6;
+        hasMarkedDay = hasMarkedDay || Boolean(reasonId);
         const bg = reasonColors[reasonId] || '';
         const color = reasonTextColors[reasonId] || '';
         const style = bg ? ` style="background:${bg};color:${color};font-weight:600"` : (isWeekend ? ' class="weekend"' : '');
         return `<td${style}>${esc(reasonId)}</td>`;
       }).join('');
+      if (!hasMarkedDay) {
+        return '';
+      }
       const vacDays = vacationDaysForEmployee(employee);
       const remaining = remainingVacationDaysForEmployee(employee, matrixRefDate);
       return `<tr><td class="name-cell">${name}</td>${dayCells}<td class="summary-cell">${vacDays}</td><td class="summary-cell">${remaining}</td></tr>`;
-    }).join('');
+    }).filter(Boolean).join('');
 
     const legendRows = [
       { id: 'V', label: 'Vacaciones', bg: '#4ade80', color: '#14532d' },
@@ -2085,11 +2106,11 @@
     table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #ccc; text-align: center; padding: 3px 2px; white-space: nowrap; }
     th { background: #f3f4f6; font-size: 9px; }
-    th.weekend, td.weekend { background: #f9fafb; color: #9ca3af; }
+    th.weekend { background: #f9fafb; color: #9ca3af; }
+    td.weekend { color: #9ca3af; }
     td.name-cell { text-align: left; padding-left: 6px; font-weight: 500; min-width: 140px; max-width: 180px; white-space: normal; word-break: break-word; }
     td.summary-cell { font-weight: 700; background: #f3f4f6; }
-    tr:nth-child(even) td { background-color: #fafafa; }
-    tr:nth-child(even) td.summary-cell { background: #ececec; }
+    td.empty-cell { padding: 14px; color: #555; font-weight: 600; }
     @page { size: A3 landscape; margin: 12mm; }
     @media print { body { padding: 0; } }
   </style>
@@ -2107,7 +2128,7 @@
         <th>Restantes</th>
       </tr>
     </thead>
-    <tbody>${employeeRows}</tbody>
+    <tbody>${employeeRows || `<tr><td class="empty-cell" colspan="${daysInMonth + 3}">No hay registros marcados para este mes.</td></tr>`}</tbody>
   </table>
 </body>
 </html>`;
@@ -2218,6 +2239,7 @@
     <div class="section-title">Datos personales</div>
     <div class="fields-grid three-col">
       ${field('CURP', detail.curp)}
+      ${field('NSS', detail.nss)}
       ${field('Fecha de nacimiento', detail.fecha_nacimiento)}
       ${field('Edad', age ? `${age} años` : '')}
       ${field('Estado civil', detail.estado_civil)}
@@ -2451,6 +2473,7 @@
         const haystack = [
           employeeName(employee),
           detail?.curp || '',
+          detail?.nss || '',
           positionLabel,
           storeLabel,
           detail?.correo || '',
@@ -2496,7 +2519,7 @@
 
     if (state.employees.length === 0) {
       employeeDatabaseTableBody.innerHTML =
-        '<tr><td colspan="11" class="employees-empty">No hay empleados registrados.</td></tr>';
+        '<tr><td colspan="12" class="employees-empty">No hay empleados registrados.</td></tr>';
       return;
     }
 
@@ -2506,7 +2529,7 @@
         : filterMonth != null
           ? `Ningún empleado cumple años en ${monthNames[filterMonth]}.`
           : 'No hay empleados.';
-      employeeDatabaseTableBody.innerHTML = `<tr><td colspan="11" class="employees-empty">${msg}</td></tr>`;
+      employeeDatabaseTableBody.innerHTML = `<tr><td colspan="12" class="employees-empty">${msg}</td></tr>`;
       return;
     }
 
@@ -2535,6 +2558,7 @@
                 <span class="${statusClass}">${statusText}</span>
               </td>
               <td>${detail?.curp ? escapeHtml(detail.curp) : '<span class="database-muted">-</span>'}</td>
+              <td>${detail?.nss ? escapeHtml(detail.nss) : '<span class="database-muted">-</span>'}</td>
               <td>${age !== '' ? `${age} a&ntilde;os` : '<span class="database-muted">-</span>'}</td>
               <td>${birthdayLabel ? `<span class="birthday-date-badge">&#127874; ${escapeHtml(birthdayLabel)}</span>` : '<span class="database-muted">-</span>'}</td>
               <td>${detail?.estado_civil ? escapeHtml(detail.estado_civil) : '<span class="database-muted">-</span>'}</td>
@@ -2640,6 +2664,61 @@
       .join('');
   };
 
+  const employeeDatabaseInputForField = (field) => ({
+    curp: employeeDatabaseCurpInput,
+    nss: employeeDatabaseNssInput,
+    correo: employeeDatabaseEmailInput,
+    num_cuenta: employeeDatabaseAccountInput,
+    num_tarjeta: employeeDatabaseCardInput,
+  }[field] || null);
+
+  const clearEmployeeDatabaseValidation = () => {
+    if (employeeDatabaseFormAlert) {
+      employeeDatabaseFormAlert.textContent = '';
+      employeeDatabaseFormAlert.classList.add('hidden');
+    }
+
+    employeeDatabaseForm
+      .querySelectorAll('[aria-invalid="true"]')
+      .forEach((input) => input.removeAttribute('aria-invalid'));
+  };
+
+  const clearEmployeeDatabaseFieldValidation = (input) => {
+    if (!(input instanceof HTMLElement)) {
+      return;
+    }
+
+    input.removeAttribute('aria-invalid');
+
+    if (!employeeDatabaseForm.querySelector('[aria-invalid="true"]') && employeeDatabaseFormAlert) {
+      employeeDatabaseFormAlert.textContent = '';
+      employeeDatabaseFormAlert.classList.add('hidden');
+    }
+  };
+
+  const focusEmployeeDatabaseInput = (input) => {
+    if (!input) {
+      return;
+    }
+
+    input.setAttribute('aria-invalid', 'true');
+    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    requestAnimationFrame(() => {
+      input.focus({ preventScroll: true });
+    });
+  };
+
+  const showEmployeeDatabaseValidation = (message, input = null) => {
+    if (employeeDatabaseFormAlert) {
+      employeeDatabaseFormAlert.textContent = message;
+      employeeDatabaseFormAlert.classList.remove('hidden');
+    } else {
+      window.alert(message);
+    }
+
+    focusEmployeeDatabaseInput(input);
+  };
+
   const fillEmployeeDatabaseForm = (employeeId) => {
     const employee = state.employees.find((item) => String(item.id) === String(employeeId));
 
@@ -2661,11 +2740,13 @@
 
     state.editingEmployeeDatabaseEmployeeId = employee.id;
     employeeDatabaseForm.reset();
+    clearEmployeeDatabaseValidation();
     employeeDatabaseEmployeeInput.value = employee.id;
     employeeDatabaseModalKicker.textContent = `Empleado #${employee.id}`;
     employeeDatabaseModalTitle.textContent = employeeName(employee);
     employeeDatabaseSubmit.textContent = detail ? 'Guardar cambios' : 'Guardar expediente';
     employeeDatabaseCurpInput.value = detail?.curp || '';
+    employeeDatabaseNssInput.value = detail?.nss || '';
     employeeDatabaseBirthDateInput.value = detail?.fecha_nacimiento || '';
     employeeDatabaseCivilStatusInput.value = detail?.estado_civil || '';
     employeeDatabaseBloodTypeInput.value = detail?.tipo_sangre || '';
@@ -2707,6 +2788,7 @@
 
   const closeEmployeeDatabaseModal = () => {
     employeeDatabaseModal.classList.add('hidden');
+    clearEmployeeDatabaseValidation();
     state.editingEmployeeDatabaseEmployeeId = null;
   };
 
@@ -2715,22 +2797,26 @@
     const employee = state.employees.find((item) => String(item.id) === String(employeeId));
 
     if (!employee) {
-      window.alert('Selecciona un empleado valido.');
+      showEmployeeDatabaseValidation('Selecciona un empleado valido.', employeeDatabaseEmployeeInput);
       return;
     }
 
     const curp = trimmedText(employeeDatabaseCurpInput.value, 18).toUpperCase();
+    const nss = normalizeSocialSecurityNumber(employeeDatabaseNssInput.value);
     const birthDate = normalizeDateString(employeeDatabaseBirthDateInput.value);
 
     if (curp.length !== 18) {
-      window.alert('La CURP debe tener 18 caracteres.');
-      employeeDatabaseCurpInput.focus();
+      showEmployeeDatabaseValidation('La CURP debe tener 18 caracteres.', employeeDatabaseCurpInput);
+      return;
+    }
+
+    if (nss && nss.length !== 11) {
+      showEmployeeDatabaseValidation('El NSS debe tener 11 digitos.', employeeDatabaseNssInput);
       return;
     }
 
     if (!birthDate) {
-      window.alert('Selecciona la fecha de nacimiento.');
-      employeeDatabaseBirthDateInput.focus();
+      showEmployeeDatabaseValidation('Selecciona la fecha de nacimiento.', employeeDatabaseBirthDateInput);
       return;
     }
 
@@ -2738,6 +2824,7 @@
       id_empleado: employee.id,
       nombre: employeeName(employee),
       curp,
+      nss,
       fecha_nacimiento: birthDate,
       estado_civil: employeeDatabaseCivilStatusInput.value,
       tipo_sangre: employeeDatabaseBloodTypeInput.value,
@@ -2815,7 +2902,7 @@
     const newAllergies = allergyDescriptions.map((description, index) => ({
       id_alergia: previousAllergies[index]?.id_alergia ?? nextAllergyId++,
       id_empleado: employee.id,
-      descripcion,
+      descripcion: description,
     }));
 
     state.employeeDatabase.alergias = [
@@ -3151,6 +3238,12 @@
     addEmployeeButton.addEventListener('click', () => openEmployeeModal());
     addEmployeeDatabaseButton.addEventListener('click', () => openEmployeeDatabaseModal());
     scheduleTypeInput.addEventListener('change', setScheduleTimeInputsEnabled);
+    employeeDatabaseForm.addEventListener('input', (event) => {
+      clearEmployeeDatabaseFieldValidation(event.target);
+    });
+    employeeDatabaseForm.addEventListener('change', (event) => {
+      clearEmployeeDatabaseFieldValidation(event.target);
+    });
     employeeDatabaseEmployeeInput.addEventListener('change', () => {
       fillEmployeeDatabaseForm(employeeDatabaseEmployeeInput.value);
     });
