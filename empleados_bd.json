@@ -277,10 +277,10 @@
   ],
   "alergias": [],
   "__sync": {
-    "version": 1,
+    "source": "4bb69d41-e8d4-4e7e-9e24-f78438565371",
     "dataset": "employeeDatabase",
-    "source": "c33f5f48-061d-45c7-b6fe-5ecde38a1da3",
-    "updatedAt": "2026-06-19T16:37:27.392Z",
+    "version": 1,
+    "updatedAt": "2026-06-19T18:20:20.686Z",
     "pendingUpload": false
   }
 }
