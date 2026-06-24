@@ -211,6 +211,7 @@ textarea:focus-visible {
 .employee-submit,
 .delete-employee-button,
 .employee-table-action,
+.schedule-employee-button,
 .modal-close {
   transition:
     background-color 0.18s ease,
@@ -872,6 +873,40 @@ button.cell:hover {
   text-overflow: ellipsis;
 }
 
+.schedule-employee-button {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.schedule-employee-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-employee-button b {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-muted);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.schedule-employee-button:hover b {
+  background: var(--hover);
+  color: var(--text);
+}
+
 .schedule-cell {
   display: grid;
   place-items: center;
@@ -1073,6 +1108,104 @@ button.cell:hover {
 .employee-comment-field,
 .employee-wide-field {
   grid-column: 1 / -1;
+}
+
+.schedule-employee-picker,
+.schedule-bulk-grid label,
+.schedule-day-row label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.schedule-employee-picker select,
+.schedule-bulk-grid input,
+.schedule-bulk-grid select,
+.schedule-day-row input,
+.schedule-day-row select {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-muted);
+  color: var(--text);
+}
+
+.schedule-bulk-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel-muted);
+}
+
+.schedule-bulk-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.2fr) repeat(2, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.schedule-quick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.schedule-week-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-day-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.9fr) minmax(120px, 1fr) repeat(2, minmax(105px, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel-muted);
+}
+
+.schedule-day-row.active {
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active-border) 12%, transparent);
+}
+
+.schedule-day-name {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.schedule-day-name b {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.schedule-day-name span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.schedule-day-row input:disabled,
+.schedule-bulk-grid input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .employee-form-section {
@@ -1345,7 +1478,8 @@ button.cell:hover {
 }
 
 .schedule-modal {
-  width: min(460px, 100%);
+  width: min(760px, 100%);
+  max-height: min(760px, 92vh);
 }
 
 .employee-database-modal {
@@ -1560,6 +1694,19 @@ button.cell:hover {
 
   .employee-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .schedule-bulk-grid,
+  .schedule-day-row {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-quick-actions {
+    justify-content: stretch;
+  }
+
+  .schedule-quick-actions .employee-table-action {
+    flex: 1 1 0;
   }
 
   .modal,

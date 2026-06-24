@@ -278,23 +278,36 @@
       </div>
 
       <form id="schedule-form" class="employee-modal-body">
-        <div class="employee-form-grid">
-          <label>
-            <span>Tipo de dia</span>
-            <select id="schedule-type">
-              <option value="work">Horario</option>
-              <option value="rest">Descanso</option>
-            </select>
-          </label>
-          <label>
-            <span>Entrada</span>
-            <input id="schedule-start" type="time">
-          </label>
-          <label>
-            <span>Salida</span>
-            <input id="schedule-end" type="time">
-          </label>
+        <label class="schedule-employee-picker">
+          <span>Empleado</span>
+          <select id="schedule-employee"></select>
+        </label>
+
+        <div class="schedule-bulk-panel">
+          <div class="schedule-bulk-grid">
+            <label>
+              <span>Tipo de dia</span>
+              <select id="schedule-template-type">
+                <option value="work">Horario</option>
+                <option value="rest">Descanso</option>
+              </select>
+            </label>
+            <label>
+              <span>Entrada</span>
+              <input id="schedule-template-start" type="time">
+            </label>
+            <label>
+              <span>Salida</span>
+              <input id="schedule-template-end" type="time">
+            </label>
+          </div>
+          <div class="schedule-quick-actions">
+            <button id="schedule-apply-weekdays" class="employee-table-action" type="button">Lun-Vie</button>
+            <button id="schedule-apply-all" class="employee-table-action" type="button">Toda la semana</button>
+          </div>
         </div>
+
+        <div id="schedule-week-grid" class="schedule-week-grid"></div>
 
         <button class="employee-submit" type="submit">Guardar horario</button>
       </form>

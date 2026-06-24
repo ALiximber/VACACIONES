@@ -195,9 +195,13 @@
   const scheduleModalTitle = document.querySelector('#schedule-modal-title');
   const closeScheduleModalButton = document.querySelector('#close-schedule-modal');
   const scheduleForm = document.querySelector('#schedule-form');
-  const scheduleTypeInput = document.querySelector('#schedule-type');
-  const scheduleStartInput = document.querySelector('#schedule-start');
-  const scheduleEndInput = document.querySelector('#schedule-end');
+  const scheduleEmployeeInput = document.querySelector('#schedule-employee');
+  const scheduleTemplateTypeInput = document.querySelector('#schedule-template-type');
+  const scheduleTemplateStartInput = document.querySelector('#schedule-template-start');
+  const scheduleTemplateEndInput = document.querySelector('#schedule-template-end');
+  const scheduleApplyWeekdaysButton = document.querySelector('#schedule-apply-weekdays');
+  const scheduleApplyAllButton = document.querySelector('#schedule-apply-all');
+  const scheduleWeekGrid = document.querySelector('#schedule-week-grid');
   const addEmployeeDatabaseButton = document.querySelector('#add-employee-database-button');
   const birthdayMonthFilterInput = document.querySelector('#birthday-month-filter');
   const employeeDatabaseCount = document.querySelector('#employee-database-count');
@@ -2347,7 +2351,12 @@
           const name = escapeHtml(employeeName(employee));
 
           return `
-            <div class="schedule-employee" title="${name}">${name}</div>
+            <div class="schedule-employee" title="${name}">
+              <button class="schedule-employee-button" type="button" data-employee-id="${escapeHtml(String(employee.id))}">
+                <span>${name}</span>
+                <b>Editar</b>
+              </button>
+            </div>
             ${scheduleDays
               .map((day) => {
                 const hours = employee.horario?.[day.key];
@@ -2922,33 +2931,148 @@
     renderAll();
   };
 
-  const setScheduleTimeInputsEnabled = () => {
-    const isWorkday = scheduleTypeInput.value === 'work';
-    scheduleStartInput.disabled = !isWorkday;
-    scheduleEndInput.disabled = !isWorkday;
-    scheduleStartInput.required = isWorkday;
-    scheduleEndInput.required = isWorkday;
+  const scheduleWeekdayKeys = scheduleDays.slice(0, 5).map((day) => day.key);
+
+  const scheduleRowForDay = (dayKey) =>
+    [...scheduleWeekGrid.querySelectorAll('.schedule-day-row')]
+      .find((row) => row.dataset.scheduleDay === dayKey);
+
+  const setScheduleTemplateTimeInputsEnabled = () => {
+    const isWorkday = scheduleTemplateTypeInput.value === 'work';
+    scheduleTemplateStartInput.disabled = !isWorkday;
+    scheduleTemplateEndInput.disabled = !isWorkday;
+
+    if (!isWorkday) {
+      scheduleTemplateStartInput.value = '';
+      scheduleTemplateEndInput.value = '';
+    }
   };
 
-  const openScheduleModal = (employeeId, day) => {
-    const employee = state.employees.find((item) => String(item.id) === String(employeeId));
-    if (!employee) {
+  const setScheduleRowInputsEnabled = (row, clearRestTimes = false) => {
+    const typeInput = row.querySelector('.schedule-day-type');
+    const startInput = row.querySelector('.schedule-day-start');
+    const endInput = row.querySelector('.schedule-day-end');
+    const isWorkday = typeInput.value === 'work';
+
+    startInput.disabled = !isWorkday;
+    endInput.disabled = !isWorkday;
+    startInput.required = isWorkday;
+    endInput.required = isWorkday;
+
+    if (!isWorkday && clearRestTimes) {
+      startInput.value = '';
+      endInput.value = '';
+    }
+  };
+
+  const setScheduleDayRow = (dayKey, type, start = '', end = '') => {
+    const row = scheduleRowForDay(dayKey);
+    if (!row) {
       return;
     }
 
-    const hours = employee.horario?.[day];
-    const hasSchedule = Array.isArray(hours) && hours[0] && hours[1];
+    row.querySelector('.schedule-day-type').value = type;
+    row.querySelector('.schedule-day-start').value = type === 'work' ? start : '';
+    row.querySelector('.schedule-day-end').value = type === 'work' ? end : '';
+    setScheduleRowInputsEnabled(row);
+  };
 
-    state.editingSchedule = { employeeId: employee.id, day };
-    scheduleModalKicker.textContent = day;
+  const firstScheduleHours = (employee, preferredDay = null) => {
+    const preferredHours = employee.horario?.[preferredDay];
+
+    if (Array.isArray(preferredHours) && preferredHours[0] && preferredHours[1]) {
+      return preferredHours;
+    }
+
+    const firstHours = scheduleDays
+      .map((day) => employee.horario?.[day.key])
+      .find((hours) => Array.isArray(hours) && hours[0] && hours[1]);
+
+    return firstHours || ['09:00', '17:00'];
+  };
+
+  const renderScheduleEmployeeOptions = (selectedEmployeeId) => {
+    scheduleEmployeeInput.innerHTML = state.employees
+      .map((employee) => {
+        const selected = String(employee.id) === String(selectedEmployeeId) ? ' selected' : '';
+        return `<option value="${escapeHtml(String(employee.id))}"${selected}>${escapeHtml(employeeName(employee))}</option>`;
+      })
+      .join('');
+  };
+
+  const renderScheduleWeekRows = (employee, focusDay = null) => {
+    scheduleWeekGrid.innerHTML = scheduleDays
+      .map((day) => {
+        const hours = employee.horario?.[day.key];
+        const hasSchedule = Array.isArray(hours) && hours[0] && hours[1];
+
+        return `
+          <div class="schedule-day-row${focusDay === day.key ? ' active' : ''}" data-schedule-day="${escapeHtml(day.key)}">
+            <div class="schedule-day-name">
+              <b>${escapeHtml(day.short)}</b>
+              <span>${escapeHtml(day.key)}</span>
+            </div>
+            <label>
+              <span>Tipo</span>
+              <select class="schedule-day-type">
+                <option value="work"${hasSchedule ? ' selected' : ''}>Horario</option>
+                <option value="rest"${hasSchedule ? '' : ' selected'}>Descanso</option>
+              </select>
+            </label>
+            <label>
+              <span>Entrada</span>
+              <input class="schedule-day-start" type="time" value="${hasSchedule ? escapeHtml(hours[0]) : ''}">
+            </label>
+            <label>
+              <span>Salida</span>
+              <input class="schedule-day-end" type="time" value="${hasSchedule ? escapeHtml(hours[1]) : ''}">
+            </label>
+          </div>
+        `;
+      })
+      .join('');
+
+    scheduleWeekGrid
+      .querySelectorAll('.schedule-day-row')
+      .forEach((row) => setScheduleRowInputsEnabled(row));
+  };
+
+  const fillScheduleForm = (employeeId, focusDay = null) => {
+    const employee = state.employees.find((item) => String(item.id) === String(employeeId));
+    if (!employee) {
+      return null;
+    }
+
+    state.editingSchedule = { employeeId: employee.id };
+    scheduleEmployeeInput.value = employee.id;
+    scheduleModalKicker.textContent = 'Horario semanal';
     scheduleModalTitle.textContent = employeeName(employee);
-    scheduleTypeInput.value = hasSchedule ? 'work' : 'rest';
-    scheduleStartInput.value = hasSchedule ? hours[0] : '';
-    scheduleEndInput.value = hasSchedule ? hours[1] : '';
-    setScheduleTimeInputsEnabled();
+
+    const [start, end] = firstScheduleHours(employee, focusDay);
+    scheduleTemplateTypeInput.value = 'work';
+    scheduleTemplateStartInput.value = start;
+    scheduleTemplateEndInput.value = end;
+    setScheduleTemplateTimeInputsEnabled();
+    renderScheduleWeekRows(employee, focusDay);
+
+    return employee;
+  };
+
+  const openScheduleModal = (employeeId, day = null) => {
+    if (state.employees.length === 0) {
+      window.alert('Primero agrega un empleado.');
+      return;
+    }
+
+    const employee = state.employees.find((item) => String(item.id) === String(employeeId)) || state.employees[0];
+    renderScheduleEmployeeOptions(employee.id);
+    fillScheduleForm(employee.id, day);
 
     scheduleModal.classList.remove('hidden');
-    scheduleTypeInput.focus();
+    const focusTarget = day
+      ? scheduleRowForDay(day)?.querySelector('.schedule-day-type')
+      : scheduleEmployeeInput;
+    focusTarget?.focus();
   };
 
   const closeScheduleModal = () => {
@@ -2956,32 +3080,64 @@
     state.editingSchedule = null;
   };
 
+  const applyScheduleTemplate = (dayKeys) => {
+    const type = scheduleTemplateTypeInput.value;
+    const start = scheduleTemplateStartInput.value;
+    const end = scheduleTemplateEndInput.value;
+
+    if (type === 'work' && (!start || !end)) {
+      window.alert('Indica entrada y salida para aplicar el horario.');
+      (start ? scheduleTemplateEndInput : scheduleTemplateStartInput).focus();
+      return;
+    }
+
+    dayKeys.forEach((dayKey) => {
+      setScheduleDayRow(dayKey, type, start, end);
+    });
+  };
+
   const saveScheduleFromForm = async () => {
     if (!state.editingSchedule) {
       return;
     }
 
-    const { employeeId, day } = state.editingSchedule;
+    const employeeId = scheduleEmployeeInput.value;
     const employee = state.employees.find((item) => String(item.id) === String(employeeId));
     if (!employee) {
+      window.alert('Selecciona un empleado valido.');
       return;
     }
 
-    employee.horario = employee.horario || {};
+    const nextSchedule = {};
+    let invalidInput = null;
 
-    if (scheduleTypeInput.value === 'rest') {
-      delete employee.horario[day];
-    } else {
-      employee.horario[day] = [scheduleStartInput.value, scheduleEndInput.value];
+    scheduleDays.forEach((day) => {
+      const row = scheduleRowForDay(day.key);
+      const type = row.querySelector('.schedule-day-type').value;
+      const startInput = row.querySelector('.schedule-day-start');
+      const endInput = row.querySelector('.schedule-day-end');
+
+      if (type === 'work') {
+        if (!startInput.value || !endInput.value) {
+          invalidInput = invalidInput || (startInput.value ? endInput : startInput);
+          return;
+        }
+
+        nextSchedule[day.key] = [startInput.value, endInput.value];
+      }
+    });
+
+    if (invalidInput) {
+      invalidInput.focus();
+      return;
     }
 
+    employee.horario = nextSchedule;
     await saveEmployees();
     logInfo('Horario guardado', {
       employeeId: employee.id,
       employeeName: employeeName(employee),
-      day,
-      type: scheduleTypeInput.value === 'rest' ? 'descanso' : 'laboral',
-      hours: employee.horario[day] || null,
+      workdays: Object.keys(nextSchedule).length,
     });
     closeScheduleModal();
     renderSchedules();
@@ -3237,7 +3393,24 @@
     closeEmployeeDatabaseModalButton.addEventListener('click', closeEmployeeDatabaseModal);
     addEmployeeButton.addEventListener('click', () => openEmployeeModal());
     addEmployeeDatabaseButton.addEventListener('click', () => openEmployeeDatabaseModal());
-    scheduleTypeInput.addEventListener('change', setScheduleTimeInputsEnabled);
+    scheduleTemplateTypeInput.addEventListener('change', setScheduleTemplateTimeInputsEnabled);
+    scheduleEmployeeInput.addEventListener('change', () => {
+      fillScheduleForm(scheduleEmployeeInput.value);
+    });
+    scheduleApplyWeekdaysButton.addEventListener('click', () => {
+      applyScheduleTemplate(scheduleWeekdayKeys);
+    });
+    scheduleApplyAllButton.addEventListener('click', () => {
+      applyScheduleTemplate(scheduleDays.map((day) => day.key));
+    });
+    scheduleWeekGrid.addEventListener('change', (event) => {
+      const typeInput = event.target.closest('.schedule-day-type');
+      if (!typeInput) {
+        return;
+      }
+
+      setScheduleRowInputsEnabled(typeInput.closest('.schedule-day-row'), true);
+    });
     employeeDatabaseForm.addEventListener('input', (event) => {
       clearEmployeeDatabaseFieldValidation(event.target);
     });
@@ -3337,6 +3510,12 @@
     });
 
     scheduleGrid.addEventListener('click', (event) => {
+      const employeeButton = event.target.closest('.schedule-employee-button');
+      if (employeeButton) {
+        openScheduleModal(employeeButton.dataset.employeeId);
+        return;
+      }
+
       const cell = event.target.closest('.schedule-cell');
       if (!cell) {
         return;
