@@ -3,6 +3,11 @@
 // y sincronización LAN entre equipos en la misma red local.
 // Se comunica con la interfaz (index.js) a través de IPC (ipcMain/ipcRenderer).
 const { app, BrowserWindow, ipcMain } = require('electron');
+const {
+  makeUserNotifier,
+  updateElectronApp,
+  UpdateSourceType,
+} = require('update-electron-app');
 const { createHash, randomUUID } = require('node:crypto');
 const dgram = require('node:dgram');
 const fsNative = require('node:fs');
@@ -1733,6 +1738,35 @@ const stopDatasetFileWatchers = () => {
   fileWatchListeners.clear();
 };
 
+// En producción consulta las Releases públicas de GitHub. Squirrel descarga la
+// nueva versión en segundo plano y muestra un aviso cuando está lista.
+const startAutoUpdater = () => {
+  if (!app.isPackaged) {
+    logAppEvent('debug', 'Actualizador omitido en modo desarrollo');
+    return;
+  }
+
+  updateElectronApp({
+    updateSource: {
+      type: UpdateSourceType.ElectronPublicUpdateService,
+      repo: 'ALiximber/VACACIONES',
+    },
+    updateInterval: '1 hour',
+    logger: {
+      log: (message) => {
+        logAppEvent('info', 'Actualizador', { message });
+      },
+    },
+    notifyUser: true,
+    onNotifyUser: makeUserNotifier({
+      title: 'Actualización lista',
+      detail: 'Se descargó una nueva versión. Reinicia la aplicación para instalarla.',
+      restartButtonText: 'Reiniciar ahora',
+      laterButtonText: 'Después',
+    }),
+  });
+};
+
 // ─── MANEJADORES IPC ─────────────────────────────────────────────────────────
 // Cada manejador responde a una llamada desde la interfaz (preload.js expone estos canales).
 // registerLoggedIpcHandle envuelve todos con captura de errores y logging automático.
@@ -1867,6 +1901,7 @@ app.whenReady().then(async () => {
     logAppEvent('warn', 'No se pudo cargar configapi.txt', { error });
   });
   createWindow();
+  startAutoUpdater();
   await startLanSync().catch((error) => {
     logAppEvent('warn', 'No se pudo iniciar la sincronizacion LAN', { error });
   });
