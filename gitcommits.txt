@@ -1,0 +1,73 @@
+git add . 
+git config --global user.email "demian.tellez2006@gmail.com"
+git config --global user.name "ALiximber"
+git commit -m "message"
+git push
+
+
+
+/*
+ $env:GITHUB_TOKEN = "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"
+
+
+ Publicar una actualización nueva
+
+Cuando hagas cambios en tu app, el flujo será este.
+
+Primero confirma tus cambios:
+
+git status
+
+Agrega y guarda cambios:
+
+git add .
+git commit -m "Descripcion de los cambios"
+
+Ejecuta pruebas:
+
+npm test
+
+Luego sube versión.
+
+Para cambios pequeños:
+
+npm version patch
+
+Ejemplo:
+
+1.0.0 → 1.0.1
+
+Para cambios más importantes:
+
+npm version minor
+
+Ejemplo:
+
+1.0.0 → 1.1.0
+
+Para cambios grandes o incompatibles:
+
+npm version major
+
+Ejemplo:
+
+1.0.0 → 2.0.0
+
+Después sube commit y etiqueta:
+
+git push origin main --follow-tags
+
+Ahora publica:
+
+$env:GITHUB_TOKEN = 'TU_TOKEN_AQUI'
+npm run publish
+Remove-Item Env:GITHUB_TOKEN
+
+Luego vas otra vez a:
+
+https://github.com/ALiximber/VACACIONES/releases
+
+Revisas la Release nueva y presionas:
+
+Publish release
+*/
