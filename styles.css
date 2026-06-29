@@ -2150,3 +2150,498 @@ button.cell:hover {
   border-color: var(--danger-border, color-mix(in srgb, #e03 25%, var(--border)));
   color: var(--danger-text, #e03);
 }
+
+/* ============================================================
+   LAYOUT CON BARRA LATERAL
+   ============================================================ */
+
+body {
+  overflow: hidden;
+  background: var(--panel-strong);
+}
+
+#app-shell {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: clamp(180px, 13.5vw, 224px) minmax(0, 1fr);
+  background: var(--content-bg);
+}
+
+#sidebar {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--panel-strong);
+  box-shadow: 8px 0 24px rgba(31, 49, 40, 0.035);
+  z-index: 4;
+}
+
+.sidebar-year {
+  min-height: 80px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+#sidebar #year-nav {
+  width: 100%;
+  gap: 4px;
+  justify-content: space-between;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--panel-strong);
+  box-shadow: 0 1px 3px rgba(20, 34, 27, 0.05);
+}
+
+#sidebar #year-title {
+  min-width: 0;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+#sidebar .year-button {
+  width: 38px;
+  height: 38px;
+  border-color: var(--border);
+  border-radius: 9px;
+  font-size: 21px;
+  box-shadow: 0 1px 2px rgba(20, 34, 27, 0.04);
+}
+
+#sidebar #view-buttons {
+  width: 100%;
+  max-width: none;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+#sidebar .view-button {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+}
+
+#sidebar .view-button svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#sidebar .view-button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+#sidebar .view-button.active {
+  color: color-mix(in srgb, var(--active-border) 75%, var(--text));
+  background: color-mix(in srgb, var(--active-border) 8%, var(--panel-strong));
+  box-shadow: none;
+}
+
+.sidebar-spacer {
+  flex: 1;
+  min-height: 16px;
+}
+
+.sidebar-legend {
+  margin: 0 16px 14px;
+  padding: 14px 14px;
+  display: grid;
+  gap: 11px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--panel-strong);
+  box-shadow: 0 4px 16px rgba(25, 42, 33, 0.035);
+}
+
+.sidebar-legend span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.legend-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.legend-dot-v {
+  background: #33c966;
+}
+
+.legend-dot-d {
+  background: #ff8619;
+}
+
+.legend-dot-i {
+  background: #7567e8;
+}
+
+.legend-dot-p {
+  background: #3c91e6;
+}
+
+.sidebar-footer {
+  padding: 0 16px 16px;
+  display: grid;
+  gap: 9px;
+}
+
+#sidebar #theme-switch {
+  width: 100%;
+  padding: 3px;
+  border-radius: 10px;
+}
+
+#sidebar .theme-button {
+  min-width: 0;
+  flex: 1;
+  padding: 7px 5px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+#sidebar .sync-status {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  justify-content: flex-start;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+#sidebar .sync-dot {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sync-ok) 16%, transparent);
+}
+
+#main {
+  min-width: 0;
+  background: var(--content-bg);
+}
+
+#year {
+  min-height: 80px;
+  padding: 0 16px 0 18px;
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-strong);
+}
+
+#year.hidden,
+#months.hidden,
+.calendar-filter-label.hidden,
+.sidebar-legend.hidden {
+  display: none;
+}
+
+#year #months {
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+  padding: 0;
+  align-items: stretch;
+  border: 0;
+  background: transparent;
+}
+
+#year .month-button {
+  min-width: max-content;
+  padding: 0 12px;
+  border-bottom-width: 2px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#year .month-button:hover {
+  background: transparent;
+  color: var(--text);
+}
+
+#year .month-button.active {
+  color: color-mix(in srgb, var(--active-border) 78%, var(--text));
+  background: transparent;
+}
+
+#year #toolbar-actions {
+  flex: 0 0 auto;
+  justify-self: auto;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.calendar-filter-label {
+  display: block;
+  padding-right: 10px;
+  margin-right: 5px;
+  border-right: 1px solid var(--border);
+}
+
+#calendar-filter,
+.toolbar-button {
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(20, 34, 27, 0.035);
+}
+
+#calendar-filter {
+  width: 158px;
+  padding: 0 32px 0 12px;
+  cursor: pointer;
+}
+
+.toolbar-button {
+  padding: 0 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.toolbar-button:hover {
+  border-color: var(--border-2);
+  background: var(--hover);
+}
+
+.toolbar-arrow {
+  width: 40px;
+  padding: 0;
+  font-size: 20px;
+  color: var(--muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+#calendar-page {
+  padding: 14px 16px 16px;
+}
+
+#calendar {
+  grid-template-rows: 42px repeat(6, minmax(0, 1fr));
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(30, 47, 38, 0.055);
+}
+
+.day-name {
+  font-size: 10px;
+  letter-spacing: 0.11em;
+}
+
+.cell-header {
+  min-height: 33px;
+  padding: 8px 10px 4px;
+}
+
+.day-number {
+  min-width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.cell.adjacent .day-number {
+  font-size: 12px;
+}
+
+.cell.today {
+  z-index: 1;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--active-border) 11%, var(--cell)), var(--cell) 68%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--active-border) 38%, var(--border));
+}
+
+.cell.today .day-number {
+  background: color-mix(in srgb, var(--active-border) 78%, #176f43);
+  color: #ffffff;
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--active-border) 28%, transparent);
+}
+
+.day-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.cell-content {
+  padding: 0 8px 7px;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.calendar-event {
+  min-height: 23px;
+  gap: 5px;
+  padding: 3px 6px 3px 4px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 10px;
+  box-shadow: none;
+}
+
+.calendar-event b {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  font-size: 8px;
+}
+
+.calendar-more {
+  padding: 1px 3px 0;
+  color: color-mix(in srgb, var(--active-border) 78%, var(--text));
+  font-size: 10px;
+}
+
+.page:not(#calendar-page) {
+  padding: 18px;
+}
+
+@media (max-width: 1180px) {
+  #year {
+    grid-template-columns: none;
+    align-items: stretch;
+  }
+
+  #year #toolbar-actions {
+    justify-self: auto;
+  }
+
+  #calendar-filter {
+    width: 142px;
+  }
+
+  #year .month-button {
+    padding-inline: 10px;
+  }
+}
+
+@media (max-width: 1000px) {
+  #app-shell {
+    grid-template-columns: 82px minmax(0, 1fr);
+  }
+
+  .sidebar-year {
+    min-height: 126px;
+    padding: 9px;
+  }
+
+  #sidebar #year-nav {
+    flex-direction: column;
+  }
+
+  #sidebar #year-title {
+    order: -1;
+    font-size: 14px;
+  }
+
+  #sidebar #view-buttons {
+    padding-inline: 8px;
+  }
+
+  #sidebar .view-button {
+    justify-content: center;
+    padding: 12px 8px;
+  }
+
+  #sidebar .view-button span,
+  .sidebar-legend,
+  #sidebar #theme-switch,
+  #sidebar #sync-status span:not(.sync-dot) {
+    display: none;
+  }
+
+  .sidebar-footer {
+    padding-inline: 10px;
+  }
+
+  #sidebar .sync-status {
+    justify-content: center;
+    padding: 0;
+  }
+
+  #year {
+    padding-left: 12px;
+  }
+
+  #year .month-button {
+    padding-inline: 9px;
+  }
+}
+
+@media (max-width: 760px) {
+  #year {
+    min-height: 118px;
+    padding: 0 10px 10px;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  #year #months {
+    min-height: 60px;
+  }
+
+  #year #toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .calendar-filter-label {
+    margin-right: auto;
+  }
+}

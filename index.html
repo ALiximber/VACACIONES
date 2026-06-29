@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https:; object-src 'none'; base-uri 'self'">
   <title>Calendario de vacaciones</title>
   <link rel="icon" type="image/png" href="logo.png">
   <script>
@@ -18,23 +19,49 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="main">
-    <header id="year">
-      <div id="year-nav" aria-label="Navegacion de ano">
-        <button id="prev-year" class="year-button" type="button" aria-label="Ano anterior">&#8249;</button>
-        <div id="year-title">2026</div>
-        <button id="next-year" class="year-button" type="button" aria-label="Ano siguiente">&#8250;</button>
+  <div id="app-shell">
+    <aside id="sidebar">
+      <div class="sidebar-year">
+        <div id="year-nav" aria-label="Navegacion de ano">
+          <button id="prev-year" class="year-button" type="button" aria-label="Ano anterior">&#8249;</button>
+          <div id="year-title">2026</div>
+          <button id="next-year" class="year-button" type="button" aria-label="Ano siguiente">&#8250;</button>
+        </div>
       </div>
 
-      <div id="view-buttons" aria-label="Vistas">
-        <button class="view-button active" type="button" data-view="calendar">Calendario</button>
-        <button class="view-button" type="button" data-view="matrix">Cuadricula</button>
-        <button class="view-button" type="button" data-view="schedules">Horarios</button>
-        <button class="view-button" type="button" data-view="employees">Empleados</button>
-        <button class="view-button" type="button" data-view="employee-database">Expediente</button>
+      <nav id="view-buttons" aria-label="Vistas">
+        <button class="view-button active" type="button" data-view="calendar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"></path></svg>
+          <span>Calendario</span>
+        </button>
+        <button class="view-button" type="button" data-view="matrix">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect></svg>
+          <span>Cuadrícula</span>
+        </button>
+        <button class="view-button" type="button" data-view="schedules">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+          <span>Horarios</span>
+        </button>
+        <button class="view-button" type="button" data-view="employees">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19v-1.5A4.5 4.5 0 0 1 8 13h2a4.5 4.5 0 0 1 4.5 4.5V19"></path><circle cx="17" cy="9" r="2"></circle><path d="M16 14h1a3.5 3.5 0 0 1 3.5 3.5V19"></path></svg>
+          <span>Empleados</span>
+        </button>
+        <button class="view-button" type="button" data-view="employee-database">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"></path><path d="M15 3v5h4M9 12h6M9 16h6"></path></svg>
+          <span>Expediente</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="sidebar-legend" aria-label="Leyenda del calendario">
+        <span><i class="legend-dot legend-dot-v"></i>Vacaciones</span>
+        <span><i class="legend-dot legend-dot-d"></i>Descanso trabajado</span>
+        <span><i class="legend-dot legend-dot-i"></i>Incapacidad</span>
+        <span><i class="legend-dot legend-dot-p"></i>Permiso</span>
       </div>
 
-      <div id="toolbar-actions">
+      <div class="sidebar-footer">
         <div id="theme-switch" aria-label="Tema visual">
           <button class="theme-button" type="button" data-theme="dark" aria-pressed="false">Oscuro</button>
           <button class="theme-button active" type="button" data-theme="light" aria-pressed="true">Claro</button>
@@ -42,25 +69,45 @@
 
         <button id="sync-status" class="sync-status" type="button" data-sync-state="idle" title="Sincronizar ahora">
           <span class="sync-dot" aria-hidden="true"></span>
-          <span id="sync-status-text">Nube al dia</span>
+          <span id="sync-status-text">Nube al día</span>
         </button>
       </div>
-    </header>
+    </aside>
 
-    <div id="months">
-      <button class="month-button active" type="button" data-month="0">Enero</button>
-      <button class="month-button" type="button" data-month="1">Febrero</button>
-      <button class="month-button" type="button" data-month="2">Marzo</button>
-      <button class="month-button" type="button" data-month="3">Abril</button>
-      <button class="month-button" type="button" data-month="4">Mayo</button>
-      <button class="month-button" type="button" data-month="5">Junio</button>
-      <button class="month-button" type="button" data-month="6">Julio</button>
-      <button class="month-button" type="button" data-month="7">Agosto</button>
-      <button class="month-button" type="button" data-month="8">Septiembre</button>
-      <button class="month-button" type="button" data-month="9">Octubre</button>
-      <button class="month-button" type="button" data-month="10">Noviembre</button>
-      <button class="month-button" type="button" data-month="11">Diciembre</button>
-    </div>
+    <main id="main">
+      <header id="year">
+        <div id="months">
+          <button class="month-button active" type="button" data-month="0">Enero</button>
+          <button class="month-button" type="button" data-month="1">Febrero</button>
+          <button class="month-button" type="button" data-month="2">Marzo</button>
+          <button class="month-button" type="button" data-month="3">Abril</button>
+          <button class="month-button" type="button" data-month="4">Mayo</button>
+          <button class="month-button" type="button" data-month="5">Junio</button>
+          <button class="month-button" type="button" data-month="6">Julio</button>
+          <button class="month-button" type="button" data-month="7">Agosto</button>
+          <button class="month-button" type="button" data-month="8">Septiembre</button>
+          <button class="month-button" type="button" data-month="9">Octubre</button>
+          <button class="month-button" type="button" data-month="10">Noviembre</button>
+          <button class="month-button" type="button" data-month="11">Diciembre</button>
+        </div>
+
+        <div id="toolbar-actions">
+          <label class="calendar-filter-label">
+            <span class="sr-only">Filtrar calendario</span>
+            <select id="calendar-filter" aria-label="Filtrar calendario por estado">
+              <option value="all">Todos los estados</option>
+              <option value="V">Vacaciones</option>
+              <option value="D">Descanso trabajado</option>
+              <option value="I">Incapacidad</option>
+              <option value="P">Permiso</option>
+              <option value="special">Fechas especiales</option>
+            </select>
+          </label>
+          <button id="today-button" class="toolbar-button toolbar-today" type="button">Hoy</button>
+          <button id="prev-month" class="toolbar-button toolbar-arrow" type="button" aria-label="Mes anterior">&#8249;</button>
+          <button id="next-month" class="toolbar-button toolbar-arrow" type="button" aria-label="Mes siguiente">&#8250;</button>
+        </div>
+      </header>
 
     <section id="calendar-page" class="page active-page">
       <div id="calendar" aria-label="Calendario mensual"></div>
@@ -208,6 +255,7 @@
       </div>
     </section>
 
+    </main>
   </div>
 
   <div id="day-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="day-modal-title">

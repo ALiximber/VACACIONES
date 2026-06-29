@@ -139,6 +139,7 @@
     year: today.getFullYear(),
     month: today.getMonth(),
     view: 'calendar',
+    calendarFilter: 'all',
     events: {},
     employeeDayEvents: {},
     vacationsByEmployeeId: {},
@@ -247,10 +248,17 @@
   const dayModalContent = document.querySelector('#day-modal-content');
   const closeDayModalButton = document.querySelector('#close-day-modal');
   const yearTitle = document.querySelector('#year-title');
+  const topToolbar = document.querySelector('#year');
   const monthsBar = document.querySelector('#months');
   const monthButtons = [...document.querySelectorAll('.month-button')];
   const viewButtons = [...document.querySelectorAll('.view-button')];
   const themeButtons = [...document.querySelectorAll('.theme-button')];
+  const calendarFilterInput = document.querySelector('#calendar-filter');
+  const calendarFilterLabel = document.querySelector('.calendar-filter-label');
+  const todayButton = document.querySelector('#today-button');
+  const prevMonthButton = document.querySelector('#prev-month');
+  const nextMonthButton = document.querySelector('#next-month');
+  const sidebarLegend = document.querySelector('.sidebar-legend');
   const syncStatusButton = document.querySelector('#sync-status');
   const syncStatusText = document.querySelector('#sync-status-text');
   const prevYearButton = document.querySelector('#prev-year');
@@ -1694,6 +1702,20 @@
     return [...specialEntries, ...employeeEntries, ...notes];
   };
 
+  const calendarEntryMatchesFilter = (entry) => {
+    if (state.calendarFilter === 'all') {
+      return true;
+    }
+
+    if (state.calendarFilter === 'special') {
+      return entry.type === 'birthday' || entry.type === 'work-anniversary';
+    }
+
+    return entry.reason?.id === state.calendarFilter;
+  };
+
+  const filteredDayEntries = (key) => getDayEntries(key).filter(calendarEntryMatchesFilter);
+
   const validEmployeeDayEvents = (events = {}) =>
     Object.entries(events).reduce((result, [key, reasonId]) => {
       const parsedKey = parseEmployeeDayEventKey(key);
@@ -1904,7 +1926,10 @@
   const renderView = () => {
     const showsMonths = state.view === 'calendar' || state.view === 'matrix';
 
+    topToolbar.classList.toggle('hidden', !showsMonths);
     monthsBar.classList.toggle('hidden', !showsMonths);
+    calendarFilterLabel.classList.toggle('hidden', state.view !== 'calendar');
+    sidebarLegend.classList.toggle('hidden', state.view !== 'calendar');
     calendarPage.classList.toggle('hidden', state.view !== 'calendar');
     calendarPage.classList.toggle('active-page', state.view === 'calendar');
     matrixPage.classList.toggle('hidden', state.view !== 'matrix');
@@ -1934,7 +1959,7 @@
     }
 
     const key = dateKey(year, month, day);
-    const entries = getDayEntries(key);
+    const entries = filteredDayEntries(key);
     const isToday =
       year === today.getFullYear() &&
       month === today.getMonth() &&
@@ -1948,17 +1973,17 @@
         </div>
         <div class="cell-content">
           ${entries
-            .slice(0, 4)
+            .slice(0, 3)
             .map(
               (entry) => `
-                <div class="calendar-event ${entry.reason.className}">
+                <div class="calendar-event ${entry.reason.className}" title="${escapeHtml(`${entry.reason.label}: ${entry.name}`)}">
                   <b>${escapeHtml(entry.reason.id)}</b>
                   <span>${escapeHtml(entry.name)}</span>
                 </div>
               `,
             )
             .join('')}
-          ${entries.length > 4 ? `<div class="calendar-more">+${entries.length - 4} mas</div>` : ''}
+          ${entries.length > 3 ? `<div class="calendar-more">+${entries.length - 3} más</div>` : ''}
         </div>
       </button>
     `;
@@ -2588,9 +2613,20 @@
 
   const renderControls = () => {
     yearTitle.textContent = state.year;
+    calendarFilterInput.value = state.calendarFilter;
     monthButtons.forEach((button) => {
       button.classList.toggle('active', Number(button.dataset.month) === state.month);
     });
+    monthButtons
+      .find((button) => button.classList.contains('active'))
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  };
+
+  const changeMonth = (offset) => {
+    const target = new Date(state.year, state.month + offset, 1);
+    state.year = target.getFullYear();
+    state.month = target.getMonth();
+    renderAll();
   };
 
   const renderAll = () => {
@@ -2604,7 +2640,7 @@
   };
 
   const openDayModal = (date) => {
-    const entries = getDayEntries(date);
+    const entries = filteredDayEntries(date);
     const [_year, month, day] = date.split('-').map(Number);
 
     dayModalTitle.textContent = `${day} de ${monthNames[month - 1]} ${state.year}`;
@@ -3334,6 +3370,25 @@
         state.month = Number(button.dataset.month);
         renderAll();
       });
+    });
+
+    calendarFilterInput.addEventListener('change', () => {
+      state.calendarFilter = calendarFilterInput.value;
+      renderCalendar();
+    });
+
+    todayButton.addEventListener('click', () => {
+      state.year = today.getFullYear();
+      state.month = today.getMonth();
+      renderAll();
+    });
+
+    prevMonthButton.addEventListener('click', () => {
+      changeMonth(-1);
+    });
+
+    nextMonthButton.addEventListener('click', () => {
+      changeMonth(1);
     });
 
     viewButtons.forEach((button) => {
