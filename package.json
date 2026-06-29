@@ -1,6 +1,6 @@
 {
   "name": "vacaciones",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Aplicacion Electron para control de vacaciones y prima vacacional",
   "main": "main.js",
   "repository": {
