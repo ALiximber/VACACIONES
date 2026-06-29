@@ -7,9 +7,7 @@ git push
 
 
 /*
- $env:GITHUB_TOKEN = "github_pat_11AXUOQOI0i7ZhWM1LWK8h_    9p32wx3Fj0P1HwpttXgFpRKU41icmXN9os19FCk9V8JVPXNO3EMjDrEh73m"
-
-
+ 
  Publicar una actualización nueva
 
 Cuando hagas cambios en tu app, el flujo será este.
