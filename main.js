@@ -538,6 +538,8 @@ const localLanSyncToken = () => {
   return createHash('sha256').update(JSON.stringify(tokenSource)).digest('hex');
 };
 
+
+
 const jsonResponse = (response, statusCode, payload) => {
   response.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -545,6 +547,8 @@ const jsonResponse = (response, statusCode, payload) => {
   });
   response.end(`${JSON.stringify(payload)}\n`);
 };
+
+
 
 const readJsonRequestBody = (request) =>
   new Promise((resolve, reject) => {
